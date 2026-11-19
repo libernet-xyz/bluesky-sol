@@ -4,7 +4,9 @@
   "scripts": {
     "build": "npx hardhat build",
     "test": "npx hardhat test",
-    "prettier": "prettier --write \"**/*.{sol,js,jsx,mjs,cjs,ts,tsx,mts,cts}\""
+    "prettier": "prettier --write \"**/*.{sol,js,jsx,mjs,cjs,ts,tsx,mts,cts}\"",
+    "codegen": "cargo run --release -q --manifest-path tools/poseidon1/Cargo.toml --bin codegen > contracts/Poseidon1.sol && prettier --write contracts/Poseidon1.sol",
+    "vectors": "cargo run --release -q --manifest-path tools/poseidon1/Cargo.toml --bin vectors > test/vectors/poseidon1.json && prettier --write test/vectors/poseidon1.json"
   },
   "repository": {
     "type": "git",

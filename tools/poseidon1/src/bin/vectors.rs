@@ -6,8 +6,8 @@
 //!
 //! Every field element is a 0x-prefixed hex string.
 //!
-//! Usage: `cargo run --release --bin vectors > ../../test/vectors/poseidon1.json`, then format the
-//! result with `npx prettier --write test/vectors/poseidon1.json` from the root of the repository.
+//! The output isn't formatted: run `npm run vectors` from the root of the repository, which writes
+//! it to `test/vectors/poseidon1.json` and formats it with prettier.
 
 use serde::Serialize;
 use starkom_bluesky::{Scalar, from_const};
