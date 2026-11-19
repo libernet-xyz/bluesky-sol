@@ -2785,7 +2785,7 @@ library Poseidon1T5X5 {
 /// @dev Matches `hash` and `hash0` of the `starkom-poseidon` crate. The domain separator tags `dst`
 ///   initialize the capacity elements state[R..T], so the capacity is C = dst.length and the rate
 ///   is R = T - C. The inputs are absorbed R at a time by adding them to state[0..R], and the state
-//    is permuted after every block, the last one included. The output is state[0..R] after the last
+///   is permuted after every block, the last one included. The output is state[0..R] after the last
 ///   permutation.
 /// @dev WARNING: the last block is implicitly padded with zeros, so for example with rate 3 the
 ///   inputs [1, 2] and [1, 2, 0] collide. That's fine for inputs whose length is fixed by the
@@ -2801,8 +2801,8 @@ library Poseidon1Sponge {
   /// @dev Reverted when there are no inputs to hash.
   error EmptyInput();
 
-  /// @dev Reverted when an input or a domain separator tag is not a canonical field element,
-  ///   i.e. it's not in [0, p).
+  /// @dev Reverted when an input or a domain separator tag is not a canonical field element, i.e.
+  ///   it's not in [0, p).
   error NonCanonicalInput(uint256 value);
 
   /// @dev The BlueSky prime p.

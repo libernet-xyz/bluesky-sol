@@ -16,6 +16,9 @@ use starkom_poseidon::{BlueSkyConfigT3X5, BlueSkyConfigT4X5, BlueSkyConfigT5X5, 
 /// The BlueSky prime p.
 const MODULUS: &str = "0x7ffffffffffffffffffffffffffffffe0673ddf29e9b5547c000000000000001";
 
+/// The maximum length of the lines of the generated code.
+const MAX_LINE_LENGTH: usize = 100;
+
 /// The parameters of a Poseidon1 permutation, as defined by a `starkom-poseidon` configuration.
 struct Parameters {
     /// The name of the configuration in the `starkom-poseidon` crate.
@@ -163,17 +166,17 @@ fn permutation_library(parameters: &Parameters) -> String {
 ///   large share of the contract size limit, so this library must be deployed on its own and
 ///   linked by its users, e.g. through `Poseidon1Sponge`.
 library {library} {{
-    /// @notice Applies the permutation to a state.
-    /// @param state The state, every element in [0, p). Elements outside the range are reduced
-    ///   modulo p by the first round, so they alias canonical ones.
-    /// @return The permuted state, every element in [0, p).
-    function permute(
-        uint256[{width}] memory state
-    ) external pure returns (uint256[{width}] memory) {{
-        assembly ("memory-safe") {{
-{body}        }}
-        return state;
-    }}
+  /// @notice Applies the permutation to a state.
+  /// @param state The state, every element in [0, p). Elements outside the range are reduced
+  ///   modulo p by the first round, so they alias canonical ones.
+  /// @return The permuted state, every element in [0, p).
+  function permute(
+    uint256[{width}] memory state
+  ) external pure returns (uint256[{width}] memory) {{
+    assembly ("memory-safe") {{
+{body}    }}
+    return state;
+  }}
 }}
 "#,
         library = parameters.library_name(),
@@ -189,42 +192,42 @@ library {library} {{
 fn sponge_functions(parameters: &Parameters) -> String {
     format!(
         r#"
-    /// @notice Hashes `inputs` with the `{library}` permutation, returning the whole rate.
-    /// @dev Matches `hash::<{config}, Scalar, {width}, R, C>`.
-    /// @param dst The domain separator tags, which initialize the capacity elements. Their number
-    ///   is the capacity C, which must be less than {width}. Every tag must be in [0, p).
-    /// @param inputs The inputs, every one in [0, p). There must be at least one.
-    /// @return output The R = {width} - C elements of the rate after the last permutation.
-    function hash{suffix}(
-        uint256[] memory dst,
-        uint256[] memory inputs
-    ) internal pure returns (uint256[] memory output) {{
-        uint256 rate = _rate(dst, inputs, {width});
-        uint256[{width}] memory state;
-        for (uint256 i = 0; i < dst.length; i++) {{
-            state[rate + i] = dst[i];
-        }}
-        for (uint256 offset = 0; offset < inputs.length; offset += rate) {{
-            for (uint256 i = 0; i < rate && offset + i < inputs.length; i++) {{
-                state[i] = addmod(state[i], inputs[offset + i], P);
-            }}
-            state = {library}.permute(state);
-        }}
-        output = new uint256[](rate);
-        for (uint256 i = 0; i < rate; i++) {{
-            output[i] = state[i];
-        }}
+  /// @notice Hashes `inputs` with the `{library}` permutation, returning the whole rate.
+  /// @dev Matches `hash::<{config}, Scalar, {width}, R, C>`.
+  /// @param dst The domain separator tags, which initialize the capacity elements. Their number
+  ///   is the capacity C, which must be less than {width}. Every tag must be in [0, p).
+  /// @param inputs The inputs, every one in [0, p). There must be at least one.
+  /// @return output The R = {width} - C elements of the rate after the last permutation.
+  function hash{suffix}(
+    uint256[] memory dst,
+    uint256[] memory inputs
+  ) internal pure returns (uint256[] memory output) {{
+    uint256 rate = _rate(dst, inputs, {width});
+    uint256[{width}] memory state;
+    for (uint256 i = 0; i < dst.length; i++) {{
+      state[rate + i] = dst[i];
     }}
+    for (uint256 offset = 0; offset < inputs.length; offset += rate) {{
+      for (uint256 i = 0; i < rate && offset + i < inputs.length; i++) {{
+        state[i] = addmod(state[i], inputs[offset + i], P);
+      }}
+      state = {library}.permute(state);
+    }}
+    output = new uint256[](rate);
+    for (uint256 i = 0; i < rate; i++) {{
+      output[i] = state[i];
+    }}
+  }}
 
-    /// @notice Hashes `inputs` with the `{library}` permutation, returning the first element of
-    ///   the rate (see `hash{suffix}`).
-    /// @dev Matches `hash0::<{config}, Scalar, {width}, R, C>`.
-    function hash0{suffix}(
-        uint256[] memory dst,
-        uint256[] memory inputs
-    ) internal pure returns (uint256) {{
-        return hash{suffix}(dst, inputs)[0];
-    }}
+  /// @notice Hashes `inputs` with the `{library}` permutation, returning the first element of
+  ///   the rate (see `hash{suffix}`).
+  /// @dev Matches `hash0::<{config}, Scalar, {width}, R, C>`.
+  function hash0{suffix}(
+    uint256[] memory dst,
+    uint256[] memory inputs
+  ) internal pure returns (uint256) {{
+    return hash{suffix}(dst, inputs)[0];
+  }}
 "#,
         library = parameters.library_name(),
         config = parameters.config_name,
@@ -250,51 +253,100 @@ fn sponge_library(permutations: &[Parameters]) -> String {
 /// @dev All the functions are internal, so they're linked statically into their callers, while
 ///   every permutation is an external call to its separately deployed library.
 library Poseidon1Sponge {{
-    /// @dev Reverted when the capacity, i.e. the number of domain separator tags, is not less than
-    ///   the state width, so that there's no room for the inputs.
-    error InvalidCapacity(uint256 capacity, uint256 width);
+  /// @dev Reverted when the capacity, i.e. the number of domain separator tags, is not less than
+  ///   the state width, so that there's no room for the inputs.
+  error InvalidCapacity(uint256 capacity, uint256 width);
 
-    /// @dev Reverted when there are no inputs to hash.
-    error EmptyInput();
+  /// @dev Reverted when there are no inputs to hash.
+  error EmptyInput();
 
-    /// @dev Reverted when an input or a domain separator tag is not a canonical field element,
-    ///   i.e. it's not in [0, p).
-    error NonCanonicalInput(uint256 value);
+  /// @dev Reverted when an input or a domain separator tag is not a canonical field element,
+  ///   i.e. it's not in [0, p).
+  error NonCanonicalInput(uint256 value);
 
-    /// @dev The BlueSky prime p.
-    uint256 private constant P = {MODULUS};
+  /// @dev The BlueSky prime p.
+  uint256 private constant P = {MODULUS};
 {functions}
-    /// @dev Checks the arguments of a hash with state width `width`, reverting if they're invalid,
-    ///   and returns its rate.
-    function _rate(
-        uint256[] memory dst,
-        uint256[] memory inputs,
-        uint256 width
-    ) private pure returns (uint256) {{
-        if (dst.length >= width) {{
-            revert InvalidCapacity(dst.length, width);
-        }}
-        if (inputs.length == 0) {{
-            revert EmptyInput();
-        }}
-        for (uint256 i = 0; i < dst.length; i++) {{
-            _checkCanonical(dst[i]);
-        }}
-        for (uint256 i = 0; i < inputs.length; i++) {{
-            _checkCanonical(inputs[i]);
-        }}
-        return width - dst.length;
+  /// @dev Checks the arguments of a hash with state width `width`, reverting if they're invalid,
+  ///   and returns its rate.
+  function _rate(
+    uint256[] memory dst,
+    uint256[] memory inputs,
+    uint256 width
+  ) private pure returns (uint256) {{
+    if (dst.length >= width) {{
+      revert InvalidCapacity(dst.length, width);
     }}
+    if (inputs.length == 0) {{
+      revert EmptyInput();
+    }}
+    for (uint256 i = 0; i < dst.length; i++) {{
+      _checkCanonical(dst[i]);
+    }}
+    for (uint256 i = 0; i < inputs.length; i++) {{
+      _checkCanonical(inputs[i]);
+    }}
+    return width - dst.length;
+  }}
 
-    /// @dev Reverts if `value` is not a canonical field element.
-    function _checkCanonical(uint256 value) private pure {{
-        if (value >= P) {{
-            revert NonCanonicalInput(value);
-        }}
+  /// @dev Reverts if `value` is not a canonical field element.
+  function _checkCanonical(uint256 value) private pure {{
+    if (value >= P) {{
+      revert NonCanonicalInput(value);
     }}
+  }}
 }}
 "#
     )
+}
+
+/// Rewraps every NatSpec paragraph of `source`, i.e. a `/// ` line followed by its `///   `
+/// continuation lines, filling the lines up to `MAX_LINE_LENGTH` columns.
+///
+/// This keeps the documentation neatly wrapped whatever the values substituted into the templates.
+/// The templates use the indentation of the formatted code (2 spaces per level), so that prettier
+/// doesn't change the length of the wrapped lines.
+fn wrap_doc_comments(source: &str) -> String {
+    let lines: Vec<&str> = source.lines().collect();
+    let mut output = vec![];
+    let mut i = 0;
+    while i < lines.len() {
+        let line = lines[i];
+        let indent = &line[..(line.len() - line.trim_start().len())];
+        let text = line[indent.len()..]
+            .strip_prefix("/// ")
+            .filter(|text| !text.is_empty() && !text.starts_with(' '));
+        let Some(text) = text else {
+            output.push(line.to_string());
+            i += 1;
+            continue;
+        };
+        let continuation = format!("{indent}///   ");
+        let mut words: Vec<&str> = text.split_whitespace().collect();
+        i += 1;
+        while let Some(text) = lines
+            .get(i)
+            .and_then(|line| line.strip_prefix(&continuation))
+        {
+            if text.is_empty() || text.starts_with(' ') {
+                break;
+            }
+            words.extend(text.split_whitespace());
+            i += 1;
+        }
+        let mut current = format!("{indent}/// {}", words[0]);
+        for word in &words[1..] {
+            if current.chars().count() + 1 + word.chars().count() <= MAX_LINE_LENGTH {
+                current.push(' ');
+                current.push_str(word);
+            } else {
+                output.push(current);
+                current = format!("{continuation}{word}");
+            }
+        }
+        output.push(current);
+    }
+    output.join("\n") + "\n"
 }
 
 fn main() {
@@ -303,17 +355,19 @@ fn main() {
         Parameters::of::<BlueSkyConfigT4X5, 4>("BlueSkyConfigT4X5"),
         Parameters::of::<BlueSkyConfigT5X5, 5>("BlueSkyConfigT5X5"),
     ];
-    print!(
+    let mut source = String::from(
         r#"// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.34;
 
 // Generated by `tools/poseidon1` (`cargo run --release --bin codegen`) from the parameters of the
 // `starkom-poseidon` crate. Don't edit it by hand.
 
-"#
+"#,
     );
     for parameters in &permutations {
-        println!("{}", permutation_library(parameters));
+        source += &permutation_library(parameters);
+        source += "\n";
     }
-    print!("{}", sponge_library(&permutations));
+    source += &sponge_library(&permutations);
+    print!("{}", wrap_doc_comments(&source));
 }
