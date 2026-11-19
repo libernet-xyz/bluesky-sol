@@ -1,6 +1,11 @@
 {
   "name": "@starkom/bluesky-sol",
   "version": "1.0.0",
+  "scripts": {
+    "build": "npx hardhat build",
+    "test": "npx hardhat test",
+    "prettier": "prettier --write \"**/*.{sol,js,jsx,mjs,cjs,ts,tsx,mts,cts}\""
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/libernet-xyz/bluesky-sol.git"
