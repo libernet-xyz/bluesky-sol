@@ -24,7 +24,7 @@ struct Parameters {
     width: usize,
     /// The S-box exponent.
     alpha: usize,
-    /// The number of full rounds before the partial rounds, and also after them.
+    /// The number of full rounds on each side.
     full_rounds_per_side: usize,
     /// The number of partial rounds.
     partial_rounds: usize,
