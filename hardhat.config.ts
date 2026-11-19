@@ -7,13 +7,23 @@ export default defineConfig({
     profiles: {
       default: {
         version: "0.8.34",
+        settings: {
+          evmVersion: "cancun",
+          debug: {
+            revertStrings: "strip",
+          },
+        },
       },
       production: {
         version: "0.8.34",
         settings: {
+          evmVersion: "cancun",
+          debug: {
+            revertStrings: "strip",
+          },
           optimizer: {
             enabled: true,
-            runs: 200,
+            runs: 1_000_000,
           },
         },
       },
