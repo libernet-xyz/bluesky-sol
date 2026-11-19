@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { network } from "hardhat";
-import type { BlueSkyHarness } from "../types/ethers-contracts";
+import type { BlueSkyHarness } from "../types/ethers-contracts/index.js";
 
 const { ethers } = await network.create();
 

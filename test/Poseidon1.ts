@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { network } from "hardhat";
 import { readFileSync } from "node:fs";
-import type { Poseidon1Harness } from "../types/ethers-contracts";
+import type { Poseidon1Harness } from "../types/ethers-contracts/index.js";
 
 const { ethers } = await network.create();
 
