@@ -2780,6 +2780,2686 @@ library Poseidon1T5X5 {
   }
 }
 
+/// @title Poseidon1T3X7
+/// @notice The Poseidon1 permutation over BlueSky with state width 3 and S-box x^7.
+/// @dev Matches `permutation::<BlueSkyConfigT3X7, Scalar, 3>` of the `starkom-poseidon` crate.
+/// @dev There are 4 full rounds, 46 partial rounds, and 4 more full rounds. Every
+///   round adds its 3 round constants, applies the S-box to every element (full rounds) or
+///   only to the first one (partial rounds), and multiplies the state by the MDS matrix.
+/// @dev The round constants and the MDS matrix are hard-coded rather than stored, but they take a
+///   large share of the contract size limit, so this library must be deployed on its own and
+///   linked by its users, e.g. through `Poseidon1Sponge`.
+library Poseidon1T3X7 {
+  /// @notice Applies the permutation to a state.
+  /// @param state The state, every element in [0, p). Elements outside the range are reduced
+  ///   modulo p by the first round, so they alias canonical ones.
+  /// @return The permuted state, every element in [0, p).
+  function permute(uint256[3] memory state) external pure returns (uint256[3] memory) {
+    assembly ("memory-safe") {
+      // Multiplies the state by the MDS matrix.
+      function mds(s0, s1, s2) -> n0, n1, n2 {
+        let p := 0x7ffffffffffffffffffffffffffffffe0673ddf29e9b5547c000000000000001
+        n0 := mulmod(s0, 0x5b578332a4f9b9a6c6f121285628f9d138819e288f8ef70f04e239968be80b10, p)
+        n0 := addmod(
+          n0,
+          mulmod(s1, 0x4ad827c4ff7af328fabc1bb7d6b24cea37565c0249d3031b6321ca9cb7f8660a, p),
+          p
+        )
+        n0 := addmod(
+          n0,
+          mulmod(s2, 0x4723ab9c137e90af658383a9552d42abaf8721858d5dbff4bc42c308ab875da6, p),
+          p
+        )
+        n1 := mulmod(s0, 0x7f5c5e534efd464d1e96b5e6063b6a90a43e97d977edb37a6dfb8e16e5800032, p)
+        n1 := addmod(
+          n1,
+          mulmod(s1, 0x212a711d23cf78c3a789813024e1ca5ef49f98099fad31fd4d3f4498bad38848, p),
+          p
+        )
+        n1 := addmod(
+          n1,
+          mulmod(s2, 0x53a3993fb00f0f2cbde8a7b5a9d1c55b3111073171c33195d007f048e26b0647, p),
+          p
+        )
+        n2 := mulmod(s0, 0x29fb28d7ad173d2ca702588a846b8bacfeea1f08707588dcc1bbbc3ef7e2c1f3, p)
+        n2 := addmod(
+          n2,
+          mulmod(s1, 0x40c5d57de533e688f12c22c1460204e4a6187073b5fb0b1446f9ea32d09aa90d, p),
+          p
+        )
+        n2 := addmod(
+          n2,
+          mulmod(s2, 0x5f21a722ac24ffbc841109ff9ae554376bbd42233b3919487711df03c374f76c, p),
+          p
+        )
+      }
+      let p := 0x7ffffffffffffffffffffffffffffffe0673ddf29e9b5547c000000000000001
+      let s0 := mload(add(state, 0x0))
+      let s1 := mload(add(state, 0x20))
+      let s2 := mload(add(state, 0x40))
+      // Round 0 (full).
+      {
+        let x := addmod(s0, 0x4ff8463c72a1b08dc4e1e8bcc0c5a3ad10aa23949baa8fec2bd9476a3bd518d5, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      {
+        let x := addmod(s1, 0x7c8c526ac81ba67eb3d49438bb6e036120867be66a5925536218b58fff69e6a9, p)
+        s1 := mulmod(x, x, p)
+        s1 := mulmod(s1, x, p)
+        s1 := mulmod(s1, s1, p)
+        s1 := mulmod(s1, x, p)
+      }
+      {
+        let x := addmod(s2, 0x3a4e82b1b6d28e8fded0eb60dc11c74edf0cf96edf8763b5574e95020024ae14, p)
+        s2 := mulmod(x, x, p)
+        s2 := mulmod(s2, x, p)
+        s2 := mulmod(s2, s2, p)
+        s2 := mulmod(s2, x, p)
+      }
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 1 (full).
+      {
+        let x := addmod(s0, 0x04ccf4539d237f9e997c62e23e9c46cd8517e9f9fc9eb993000e0c2e489e9cf0, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      {
+        let x := addmod(s1, 0x443ba3649b4384bcbf5426be2e5395627cee62e78645e811ab3a3cf954367986, p)
+        s1 := mulmod(x, x, p)
+        s1 := mulmod(s1, x, p)
+        s1 := mulmod(s1, s1, p)
+        s1 := mulmod(s1, x, p)
+      }
+      {
+        let x := addmod(s2, 0x3b8533871a53efbb66ab38c3aaf233eae5bed5a2d3ca283481b0787159af1398, p)
+        s2 := mulmod(x, x, p)
+        s2 := mulmod(s2, x, p)
+        s2 := mulmod(s2, s2, p)
+        s2 := mulmod(s2, x, p)
+      }
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 2 (full).
+      {
+        let x := addmod(s0, 0x63f750d0e4f4cac89a45c888b341a589546e2ff2f139361b8e426c0418b1cb9f, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      {
+        let x := addmod(s1, 0x03991686f287060f3191123cfad693a2283e2b55bda2e12b4c7bdab2298c9764, p)
+        s1 := mulmod(x, x, p)
+        s1 := mulmod(s1, x, p)
+        s1 := mulmod(s1, s1, p)
+        s1 := mulmod(s1, x, p)
+      }
+      {
+        let x := addmod(s2, 0x6e026cb5059e64a9c82a0710e85a1d1765e8260187cbc255164ce61e666d13a3, p)
+        s2 := mulmod(x, x, p)
+        s2 := mulmod(s2, x, p)
+        s2 := mulmod(s2, s2, p)
+        s2 := mulmod(s2, x, p)
+      }
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 3 (full).
+      {
+        let x := addmod(s0, 0x557cdbef4a70dfed758ebd27cc70c044a3daa689ab1ee361572f2f0439742e40, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      {
+        let x := addmod(s1, 0x61f7a2859baed130d8d81bc18c025370d4c88218e1d700e1aa5fb1c0be4fbb05, p)
+        s1 := mulmod(x, x, p)
+        s1 := mulmod(s1, x, p)
+        s1 := mulmod(s1, s1, p)
+        s1 := mulmod(s1, x, p)
+      }
+      {
+        let x := addmod(s2, 0x33950c27821841e97d0f70bfd6645b3b28c90a1cc440e707dd2fe039c22af4aa, p)
+        s2 := mulmod(x, x, p)
+        s2 := mulmod(s2, x, p)
+        s2 := mulmod(s2, s2, p)
+        s2 := mulmod(s2, x, p)
+      }
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 4 (partial).
+      {
+        let x := addmod(s0, 0x6d23a1eafce0e72dd3d6b131c1c1a7a332b8fad605c297a7685e84ae9ce05949, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x021a8b667b84cca3f3d34544fc103a3688400adc88ba9ac7fd901c9da2c9a52c, p)
+      s2 := addmod(s2, 0x7db5fc65e5f638a70da97d9e343518b7c466d1299f29e974bb3e5015c0302f78, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 5 (partial).
+      {
+        let x := addmod(s0, 0x605708cb8ef747b1895be776add60ec558f59910eae1f90f29e2bca8c8594b2b, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x70460537ecea0ff58da8d8aba9fa92b546cf94dd33d3c83e989e3b873ca6bb08, p)
+      s2 := addmod(s2, 0x49d834824c3796e61f0710e681320e5d61f9bbc4c4b29604f8bde495575ba92f, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 6 (partial).
+      {
+        let x := addmod(s0, 0x28a32255ea0893dc307603bd5fed434be093194807a6cb22dd1c821de8568b69, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x4f03e612a2c0d6069a67dc1da089d7e4f1a644cac481ebeb31b33e06fb7deeb7, p)
+      s2 := addmod(s2, 0x69a3bf2e487172a2827929d0674c1d92229a9d831b9fee2bc4fdd2635fc065db, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 7 (partial).
+      {
+        let x := addmod(s0, 0x1458f23d9392ef02cc8a78b7415f3ec8cd84f07139373ce8dbdad43af99786ea, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x778fac27659f8b3948d09cf1e2491b305bb667177ab166930dbf2ea0e47616b8, p)
+      s2 := addmod(s2, 0x7d5205e41e37374cd0fb34c3b0c2c1f424621d2d39d5469c34af25c969594ced, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 8 (partial).
+      {
+        let x := addmod(s0, 0x6985b58a96c87e19984cb03801647c84f3b21cc1abc684257d3b24431083eaa0, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x440ae023d8f7c8c74fb288c74e24eab96dc89469cef1953d2e9abe304494749a, p)
+      s2 := addmod(s2, 0x0bb7f8a388527905aadf1e8b26fa77aaa8d3297895bc349e09de2297c7d5d581, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 9 (partial).
+      {
+        let x := addmod(s0, 0x45eb727a8a95281bd5fffd6f6636c9ddf9acc61b0f8fde5ed307aa600f0884bb, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x56aee526aa40bada074dd44aedaf042f4e547827db1d5067e3e21b131cfe9683, p)
+      s2 := addmod(s2, 0x60d48186a9fce04ced760e43904a416694f1859889cbbdab224b6bf35b9e1639, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 10 (partial).
+      {
+        let x := addmod(s0, 0x13ac45ef3b7c25881849e80deb68a77eb6e62e881413c449bbf29cc226ae31a4, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x0b4a7c4922f3a04cefc0575d15e92ce93c40999d87db5a0d155d8cd03192bb88, p)
+      s2 := addmod(s2, 0x6b99c7276b21040abbaa9ba64592f676c84522fa4278f324250267b16adfdb67, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 11 (partial).
+      {
+        let x := addmod(s0, 0x2f902194ab0b7140e836759c9dd24ea97549a9bf060f6e8a2f8bde7ba79e1aa6, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x3a7d2bd9797a181b99e6b6738beadfc542541cd94ab1dceb3b5eb54f509eae60, p)
+      s2 := addmod(s2, 0x762db58f70f1226eeac4087f34ffec1b314c72a7891cbf9f1fe9f6313aca904f, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 12 (partial).
+      {
+        let x := addmod(s0, 0x709fc29d8b6f848bacca212c1e0eb9fe69144482c0fce1c8b02a29a3c6979ffe, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x13971fb2c8cab8ba9c75c94c84dbad24a78a1288a51b64f7776997060cc5cb97, p)
+      s2 := addmod(s2, 0x2625bdca0141804a3b7a4d0ed90b67959872f03e3499df3291bd6a7a13dac535, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 13 (partial).
+      {
+        let x := addmod(s0, 0x4a5ad516c7f73c6e5400d692e0f02769eabc09ab44a1d1bf6b3b24203b65f856, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x11f1c05e277fe832bbe13af0778c6e5678b81d1b9a9fe05f76ec5b90415b506f, p)
+      s2 := addmod(s2, 0x4804a2e825946b54794cdd0e4f8788af140308991784e408fb119ce1bb39b735, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 14 (partial).
+      {
+        let x := addmod(s0, 0x7f1358aaf0963dda1310d4706de3870aa5aec1b1617a35d2238c8bed89d445d1, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x2b9cfb22bbb84a9a6b21dea110465de13bc82051f497b7a7dc00518260b8c7d6, p)
+      s2 := addmod(s2, 0x5105fe7dc4686cbadba0d4f5d11d9f749b76c8b87e3b74c2e626c88a98dfdac0, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 15 (partial).
+      {
+        let x := addmod(s0, 0x540a9271e20638f98ba3fa5f189242f748633565874e3e26e4c1d6cbaa95420e, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x329d36439e8112363913b33be752bf4ef9dfa51821c5f251273c7c615478f09a, p)
+      s2 := addmod(s2, 0x42a916a6736a84d5210baac9e87a210244b0c0ced8126a108f611f0a59339a59, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 16 (partial).
+      {
+        let x := addmod(s0, 0x3a5e90e5ba895db84b6356c92d2e8cd935b9ddbc82407fa03cd29062adeb23ae, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x369c4aebee1d784b93929e2300d59d89a42701c57bf7c175a288d91a75cf276d, p)
+      s2 := addmod(s2, 0x41cdabbed4f3326d74f444f72fc82fd746943ca96e91344af217af61e615214a, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 17 (partial).
+      {
+        let x := addmod(s0, 0x4a1ba23b255a9b343f0a024dad8f13cfef679c4ca0d11e91da92117ac4065c80, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x5339eed9312afac67a61169cc7ea5841fbf69030490f52acdaa07dec7ce2fcde, p)
+      s2 := addmod(s2, 0x6989a40cc7489c732b9c9e60f6acbe13c45f0f623984f19918d02f1fbf42330d, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 18 (partial).
+      {
+        let x := addmod(s0, 0x443def6b056229c2c6d9bf65a678359bedad497224809e17610f975065ab4b15, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x0609223eb0ee1b7082f006777e870b18083e22cc504c63fe6c90a2aa861059be, p)
+      s2 := addmod(s2, 0x5067cd0b15462b540fece2847657d8f7e4e8a0ddec1895d2d9b750b86c870062, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 19 (partial).
+      {
+        let x := addmod(s0, 0x0b7f14f0351d5c07a35ec15839bb3de7b3861416af742e670bde439f2cfc3295, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x4d2ee1454c2ae3e9d2b311adc26da2f88e1eb54f22725d17589362d00e25c706, p)
+      s2 := addmod(s2, 0x38bff3b15a73d09a85198b193493b049eae7a9a7a296378ca4d1edf9eb751a53, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 20 (partial).
+      {
+        let x := addmod(s0, 0x65fc6a8b46bb2a15feb4113406d44e56b639d1d3d953a1cde5adf8bc92dfaaf0, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x4284dd731ecd0a13809742e71ec11d8c8f3a6cd02a5bc312021b16641cb684bd, p)
+      s2 := addmod(s2, 0x399a84d28971c77349e05b31c1bcffffb52d490843934631bccdb6e08857b668, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 21 (partial).
+      {
+        let x := addmod(s0, 0x2a1d1229460f63b79a644cc541d7e3745cbbda48f91f71dd84c07639afa64d06, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x32f5523269c6a6b47f5b1201d4fcd1ac9f416348d0a12675fe88bbfb2feedd7c, p)
+      s2 := addmod(s2, 0x6a456f940871c13189b6b6af0b97cc452a09271be70b14978999969e220e08d1, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 22 (partial).
+      {
+        let x := addmod(s0, 0x48d50871a7d1fb2aeff297427019b479084cb86b41c6105e839e2d7b5634f9c6, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x6be05190de0e3ea2e25aa4ae8ea8f1f5dc42242b1e4bf10223cac54cb22c89e7, p)
+      s2 := addmod(s2, 0x38ff80bf1a7d6f254621b7acb345888b391f0fe37538f11b658404a6e90da7a7, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 23 (partial).
+      {
+        let x := addmod(s0, 0x1d14dea3740a01b82f0e28fb0df10170db5b30fb88eb1cdf6791d0687626a6a1, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x1ecf97f6ecdddcd748422d184186c93e6e14835b48eb28ae65cd851cf279b138, p)
+      s2 := addmod(s2, 0x14bcd58afdad66950e5fe94cabd7dab742ee81e97236bf617cc88b0a228c182b, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 24 (partial).
+      {
+        let x := addmod(s0, 0x2ed77389063ec044f921db25fae3c140a90e22693cb91bfa2e39dc04ccdd283c, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x67477a2e6354b52234575a550c73f64411706f1d558e9e9705fb4324c5965604, p)
+      s2 := addmod(s2, 0x3795e720106643c9277c4195fba63103372e69ea84d8937542ad2d3bc8f445c0, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 25 (partial).
+      {
+        let x := addmod(s0, 0x2091e2d52ad2f53bf79e82fe1668499e3db7fd20ff9dfde1980d8833430c9875, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x26a47d2904273880b9fef66e016de89caede1254e9f62a92acf877f369c272e4, p)
+      s2 := addmod(s2, 0x0eb8a126084d3d6058c216f0ef334cf3419a9aefcb8d8f09aed49a3671b09e3d, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 26 (partial).
+      {
+        let x := addmod(s0, 0x55d2e88a8ff1c1cb692b9b9b9101dd2a12b20fe95edd5abc3fc3d2f8192deaf9, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x291f81b51a7f1d3a7ce1f27c7663acced21341e1617a817f4ffce284dbabd466, p)
+      s2 := addmod(s2, 0x59f5fcaae7f666e0b446d4303902d8c4cccd6b8e963665b1d4cedb4a1f54a6ac, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 27 (partial).
+      {
+        let x := addmod(s0, 0x0f8266827426e9fcb1d2e82d3341137623a9c6c77c5db5e700c42bd5333ca035, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x465bc16c162452b27aaf3b08596c0b90ab2e0ab0ad57bf7c289189ddce6cebb9, p)
+      s2 := addmod(s2, 0x16d89e473d86d2d7fb2cd56e148ca81658fe38c7c48762e61cbb1516df0ee6fb, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 28 (partial).
+      {
+        let x := addmod(s0, 0x2d51735f6b8fab35e1d570e8320a9044caae75fea374cf7e70c9bb769f3b0790, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x3d625164d1b4a72753d5344e61c6ef8a4b46813e8a2ec85667255bf3267b7e47, p)
+      s2 := addmod(s2, 0x7b939edbce0f3e57186ce784a4b2cc5e4fb180d745bf27d871812adf95a35878, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 29 (partial).
+      {
+        let x := addmod(s0, 0x2322442c76ad2d942b875b4b679fecf9333f05c2f5d6d1b664928062345d1f00, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x4e59555efe09a65e448de512f55354626849ccfe95c7ebdeb17fd37c6752ee9b, p)
+      s2 := addmod(s2, 0x0707bbe7470c4a507f13cebc5b7c4369379304178d65977c9ab5c35b3d907a6f, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 30 (partial).
+      {
+        let x := addmod(s0, 0x6ff68760a933ebab45679ebfec428284055dfa2822e262a9e0fa528d19dff9aa, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x6499612bd0b5c6d01f0cc5a5f8701b3a818c3edc64fd61b8d5f54d866038b550, p)
+      s2 := addmod(s2, 0x39f2dcccfd1ed386c0243314a43d6362ed9de1335b5e49512ecf41046771dd65, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 31 (partial).
+      {
+        let x := addmod(s0, 0x21b1bbf8828a6edb1033b1ee83d2b879378ae070eb1a8ab25d868cc3ca8e8cb7, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x320d9020e94b7970122f93097df42692aa51766ea8cbc83a6714a02664be5b15, p)
+      s2 := addmod(s2, 0x1198915588403f05eeea52669a1aedfd9b97c1a4ecfbcad7916a13ffe5a29b2c, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 32 (partial).
+      {
+        let x := addmod(s0, 0x16d7ba0583e1250f474c67c57437ecc6769f230fbf1ddf8eae0bde90377c3df2, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x6b844baba878952fba591057f7ddcfcd260ac6f023850780f570bccd0cf6fc6e, p)
+      s2 := addmod(s2, 0x118e308b6b1700ef1303a70e832c234ad13caa42ac7c68112e5a5e37b7970ef0, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 33 (partial).
+      {
+        let x := addmod(s0, 0x66dbf5e1c08d7ed940d9d6f5be581a9c95d4767018fa1adc8291219b5d9180c6, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x658839c316765f9f1b778fe0402f0f595d606edff3bd64f011df5bd36ced148d, p)
+      s2 := addmod(s2, 0x541611118c03ff9a69388ebd0ca17823f5f488dfabd553415e14f821e101b7ee, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 34 (partial).
+      {
+        let x := addmod(s0, 0x7728ca5e7c52b37b37574afdc0b76e8768388dd6bdc6fceba672220e867e1b3d, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x5e659a3ae9802e51f02b6b60c49cb553082d278bb45df692d2d5c6ea825d7d43, p)
+      s2 := addmod(s2, 0x4996dce05b3402f9e98cd21e263111f39a0df2e7fa6c49bcc0599589ba10b2b5, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 35 (partial).
+      {
+        let x := addmod(s0, 0x3b61c04b050aeaf8c72b0e3598f7113697bbce2f3c0c4fdeddb63201c0b74d69, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x243d963e48039a7a54f02c8313d0d48e0b054b199c05e3b881ec3f7191d85c6e, p)
+      s2 := addmod(s2, 0x068bd64193d5afff57615c930b876268486a697d719ce5c881b9966f91ee44e9, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 36 (partial).
+      {
+        let x := addmod(s0, 0x4ca81d1a4cc478c19caab6f4474388adf1aaac72a754bceee56ecc27168ea0be, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x1d03d46d1b7b810d178f6f7575addd915ac34ef6cf200007f256b56b5b63f070, p)
+      s2 := addmod(s2, 0x28e738b617f5053c250dda618abb3f3fe230ee7407dda1f557b5d43b1398521e, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 37 (partial).
+      {
+        let x := addmod(s0, 0x3defe20401adbd8b92c7377f11721951916538abd84f02f1ea74566a7f4971d3, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x7215aa3cf517c8ad04a42cddf9a1655a0b175912c60f78f9029eb99509c2e894, p)
+      s2 := addmod(s2, 0x21106d91da6794bb7990f9331c62fa01e9d1c1c46cb569acb44abfd8d65f98e0, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 38 (partial).
+      {
+        let x := addmod(s0, 0x22f5f72e90f53e60938f63159d7274890b004e81135534ce4cdd0c3a28fd3fcb, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x38f5f1522272002bdcff6b8b03e0e7de07e454d300ac3b7cbab06e7b88feb7b4, p)
+      s2 := addmod(s2, 0x1f7152e87701e7a89195abf7fab14b4cfe93cfaaf755b2d596968fd86403b454, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 39 (partial).
+      {
+        let x := addmod(s0, 0x12a4ddb29d6f911326b0e125b00441396efc5001306f24c7d97c87771e0c54c7, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x4bf53100b5c4c7f26c7af0935249af2e8197ddaddeddedc6a7f2680c7f745638, p)
+      s2 := addmod(s2, 0x4b97c45fcfd1ea334366d4114001af0657836d62af54609b0bb1790c7754eb27, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 40 (partial).
+      {
+        let x := addmod(s0, 0x64b30fc84f182117de4e1d31d4495a4f8ec587e0cdbd1105b936e6e550127b6e, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x6469911d1b4d34658d97822ba4cf2bd12cee1364a712726c53503150914981a5, p)
+      s2 := addmod(s2, 0x10d7521779f9f651169c3c73845f2a59dd5d8e77d78af78f2a95a53e82fd28e0, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 41 (partial).
+      {
+        let x := addmod(s0, 0x4f514d3178671c5be3f68af4381e4c77ccc36e931b7942ba63526eb912e42696, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x03037379506432e9fe004780a3a4196eef9517a56f46de8d93ba9c8dd5f7c840, p)
+      s2 := addmod(s2, 0x0286e82f484b386c5ebefe7b6f2aaf2130980e7447f5258ea91eb90a6d350d5f, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 42 (partial).
+      {
+        let x := addmod(s0, 0x4b2a72be4eb7a8517c7715c4c4c3c84faadf0169bed99810bfb346b491c3510e, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x7bb4c96fc343206d317e512bed6e7f7f887370689f5925f0d2e5d2cfc92e51a7, p)
+      s2 := addmod(s2, 0x07ebbbd25d8d45fb673d869ddd7adb9487dd7d5038483cd90863cb8ce03d2317, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 43 (partial).
+      {
+        let x := addmod(s0, 0x29b84373d7a00d0b4080e3b59d045ce1027f579bbe5d18c6c57e7b64ebb0f755, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x13a3ac66ce61aff5afc211b2b1734f685eac24791d699b442f8510593ede1eed, p)
+      s2 := addmod(s2, 0x2766291c227a3cb6b7b2cafe1abac0ceb98b33684bb4e931f9535bbd2951efca, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 44 (partial).
+      {
+        let x := addmod(s0, 0x5f1d314b3c3f1d63556bb6a7cada8055688cfc88a81aeaa3c42a0955625572db, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x21ebbc26fa478a084d57dbb40ef2e575b1c5522675ea0b05e827dcb82b59f8f0, p)
+      s2 := addmod(s2, 0x3319ba0b3c2b0971be84e54414e51ae3853414ccd69e96216f00adcf421697f3, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 45 (partial).
+      {
+        let x := addmod(s0, 0x5a7efdadb88b6f6bf1cee1715db39cdd9410d36ce7a77019f03f6cceed5b21d1, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x1e5fa0e51d5a76e1e03bfb10599580cc17548caef0b9e31764df2d17edcd601d, p)
+      s2 := addmod(s2, 0x24bc8de46b9f51b20505d23fe6bc9b6fe5d826075ee46c525d77946fd747ee3e, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 46 (partial).
+      {
+        let x := addmod(s0, 0x439e0e07e439f162c3bc5d44f9e38d8fbeca77c4011492aee5f3d04694860e0f, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x7f3aa84a621dced7baaf63ab40700a6c320dba06d1d3e6b6ef5fe8e985ad795a, p)
+      s2 := addmod(s2, 0x2b7aec02bc52ea82b1b2774e575bcb9885b35ba8eee952abdcdcfc36a312e520, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 47 (partial).
+      {
+        let x := addmod(s0, 0x381a20d06a9c4a7fde6935bdb9930e22b6854ae0edb320e4f5a2208d4548e422, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x4ca55813b0db3f729e9e33141ebf34071459abd8d7d6175cf1276bc3ee0b3a56, p)
+      s2 := addmod(s2, 0x76bfcb1b81057b5caf4ae4b5dada0f8c308e9d4609b00ad7ea3512ebcaa81994, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 48 (partial).
+      {
+        let x := addmod(s0, 0x79eb8e9abe81331a4eda37d784caaa7fe22e4a869cd2cdc2c0b2b86024520840, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x0ff909dbf7e466f0aa0302d61b71800d1eeffc6b1a98a5178a86efbe582973c8, p)
+      s2 := addmod(s2, 0x071a1104f6286bcd82154ed5b1ead0054bd7990cc6bc277ac8adb46253c97e27, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 49 (partial).
+      {
+        let x := addmod(s0, 0x66cf243d96cf0159d32f6d645f616bf97ccaed1874a02f15f46ff88d426b75fe, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x1468899df5b95e8034d5d604a7df5ea2ad939c3f3c68d4883412ec78f3e3cfbe, p)
+      s2 := addmod(s2, 0x153d5e5d8b0ec68eb66b5c6cd23a4694562a758ee6aaac92b145eb79631af89c, p)
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 50 (full).
+      {
+        let x := addmod(s0, 0x4bafb1794cf52f204908f0e806539f3acbac4d966c75efdf2c5d55f71454faee, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      {
+        let x := addmod(s1, 0x5975b370c493d060dfbbf51a3b5159826b58dd56bcd6baeba11917c7b1a5e3c5, p)
+        s1 := mulmod(x, x, p)
+        s1 := mulmod(s1, x, p)
+        s1 := mulmod(s1, s1, p)
+        s1 := mulmod(s1, x, p)
+      }
+      {
+        let x := addmod(s2, 0x7c9f35dd9510668710f0bccbdf5bd5b9d75355c6977921995996868ac6d9ed85, p)
+        s2 := mulmod(x, x, p)
+        s2 := mulmod(s2, x, p)
+        s2 := mulmod(s2, s2, p)
+        s2 := mulmod(s2, x, p)
+      }
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 51 (full).
+      {
+        let x := addmod(s0, 0x556c35d17d9a65448cd7344e267837f463aa4e13780c58c619c382152b1a9ff4, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      {
+        let x := addmod(s1, 0x6ff47672d095555e043598e882ecb660adbc3b176e3654bf57847a311d248d24, p)
+        s1 := mulmod(x, x, p)
+        s1 := mulmod(s1, x, p)
+        s1 := mulmod(s1, s1, p)
+        s1 := mulmod(s1, x, p)
+      }
+      {
+        let x := addmod(s2, 0x2c8bac0e0510c1fd3fc4e36722abbeb10cc5ef42d8ec81c80994e86df979b350, p)
+        s2 := mulmod(x, x, p)
+        s2 := mulmod(s2, x, p)
+        s2 := mulmod(s2, s2, p)
+        s2 := mulmod(s2, x, p)
+      }
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 52 (full).
+      {
+        let x := addmod(s0, 0x795d2e92b7bc9afe0d7dc4650dcff03439f65fd253b38a2f29bea3f537e805c9, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      {
+        let x := addmod(s1, 0x45c2917fe9a00753bb0bf2414662c2510049090afa8809f2ce2c49e9bce5c648, p)
+        s1 := mulmod(x, x, p)
+        s1 := mulmod(s1, x, p)
+        s1 := mulmod(s1, s1, p)
+        s1 := mulmod(s1, x, p)
+      }
+      {
+        let x := addmod(s2, 0x78b8efe949e32e667ccea66bf0fd83c7fde49f20bbb608618e5c9b10e87aa3da, p)
+        s2 := mulmod(x, x, p)
+        s2 := mulmod(s2, x, p)
+        s2 := mulmod(s2, s2, p)
+        s2 := mulmod(s2, x, p)
+      }
+      s0, s1, s2 := mds(s0, s1, s2)
+      // Round 53 (full).
+      {
+        let x := addmod(s0, 0x68096706a87d4d37c0867430dc5e0ef876de81764cbac553f46329c4be6cf148, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      {
+        let x := addmod(s1, 0x689882384e6c73320e5ffddc33f862111b69c1df88f697e92d42244a01409a72, p)
+        s1 := mulmod(x, x, p)
+        s1 := mulmod(s1, x, p)
+        s1 := mulmod(s1, s1, p)
+        s1 := mulmod(s1, x, p)
+      }
+      {
+        let x := addmod(s2, 0x6228a939988b4a878b723bb9604b7626f48c44158aa563cd6522c7e604402543, p)
+        s2 := mulmod(x, x, p)
+        s2 := mulmod(s2, x, p)
+        s2 := mulmod(s2, s2, p)
+        s2 := mulmod(s2, x, p)
+      }
+      s0, s1, s2 := mds(s0, s1, s2)
+      mstore(add(state, 0x0), s0)
+      mstore(add(state, 0x20), s1)
+      mstore(add(state, 0x40), s2)
+    }
+    return state;
+  }
+}
+
+/// @title Poseidon1T4X7
+/// @notice The Poseidon1 permutation over BlueSky with state width 4 and S-box x^7.
+/// @dev Matches `permutation::<BlueSkyConfigT4X7, Scalar, 4>` of the `starkom-poseidon` crate.
+/// @dev There are 4 full rounds, 46 partial rounds, and 4 more full rounds. Every
+///   round adds its 4 round constants, applies the S-box to every element (full rounds) or
+///   only to the first one (partial rounds), and multiplies the state by the MDS matrix.
+/// @dev The round constants and the MDS matrix are hard-coded rather than stored, but they take a
+///   large share of the contract size limit, so this library must be deployed on its own and
+///   linked by its users, e.g. through `Poseidon1Sponge`.
+library Poseidon1T4X7 {
+  /// @notice Applies the permutation to a state.
+  /// @param state The state, every element in [0, p). Elements outside the range are reduced
+  ///   modulo p by the first round, so they alias canonical ones.
+  /// @return The permuted state, every element in [0, p).
+  function permute(uint256[4] memory state) external pure returns (uint256[4] memory) {
+    assembly ("memory-safe") {
+      // Multiplies the state by the MDS matrix.
+      function mds(s0, s1, s2, s3) -> n0, n1, n2, n3 {
+        let p := 0x7ffffffffffffffffffffffffffffffe0673ddf29e9b5547c000000000000001
+        n0 := mulmod(s0, 0x08a744fb7b1b9cc1507808a8c9c0b54d302b5d13125ff2da28d65200545a4757, p)
+        n0 := addmod(
+          n0,
+          mulmod(s1, 0x435aeddbb21c46f801961009683b338f583b39bad8fae3ec8bac7a32e0d5aa9b, p),
+          p
+        )
+        n0 := addmod(
+          n0,
+          mulmod(s2, 0x02f4dc98cc23af2b33c4d525e6b928ceb4118c5169244c32a448d8330a959bd6, p),
+          p
+        )
+        n0 := addmod(
+          n0,
+          mulmod(s3, 0x6551f135e870b5dcd2406389abff9465f531d295000bea5f43a515078412c300, p),
+          p
+        )
+        n1 := mulmod(s0, 0x03a8a301d6555b227ef2675043e66888ea3e4cc47467c6da5162f8790752e140, p)
+        n1 := addmod(
+          n1,
+          mulmod(s1, 0x22d66d061f6a927e09ca0dbdebed03956a98c4c6d320858db51d50675486058a, p),
+          p
+        )
+        n1 := addmod(
+          n1,
+          mulmod(s2, 0x1ca2f7958c3c6dc74b654d1fe6751d570b578a08cd02bda9d72d1053a19ab108, p),
+          p
+        )
+        n1 := addmod(
+          n1,
+          mulmod(s3, 0x09b232654dae6d163169d786beb72398f9ae883e9b8d3626bdf97bed6df80b97, p),
+          p
+        )
+        n2 := mulmod(s0, 0x0e4956e0154064c40c4ea94a978987b7c8a63557b7d40574c56991ee15b871fb, p)
+        n2 := addmod(
+          n2,
+          mulmod(s1, 0x4db4d3acea26b4e72e5dc41ab6e64f3c72ee298620fd32a26bf3b910b0383452, p),
+          p
+        )
+        n2 := addmod(
+          n2,
+          mulmod(s2, 0x6da690cbdc1042888029a533957badb13be3c5ad045addc3077157a1e5757dad, p),
+          p
+        )
+        n2 := addmod(
+          n2,
+          mulmod(s3, 0x5d1d7751fef4f741d50ccab71c4a2468979df88280e2969ae2e48e5a99905a29, p),
+          p
+        )
+        n3 := mulmod(s0, 0x04104725f235123fc5515835ae40c78f0e19d5cdd12cb7d030e8b6c816987e6d, p)
+        n3 := addmod(
+          n3,
+          mulmod(s1, 0x42eeab09ead3c557f587f9d4f31d57640a586435ad193201775b9cf08d031825, p),
+          p
+        )
+        n3 := addmod(
+          n3,
+          mulmod(s2, 0x1b65071716243bdd493b9524e6cffa89aff35502c30faf32862b8b3659bb223d, p),
+          p
+        )
+        n3 := addmod(
+          n3,
+          mulmod(s3, 0x431966ff3380f93b75bcac4d29b3f9ad914c4624eda264a13d1e78fc80466fcc, p),
+          p
+        )
+      }
+      let p := 0x7ffffffffffffffffffffffffffffffe0673ddf29e9b5547c000000000000001
+      let s0 := mload(add(state, 0x0))
+      let s1 := mload(add(state, 0x20))
+      let s2 := mload(add(state, 0x40))
+      let s3 := mload(add(state, 0x60))
+      // Round 0 (full).
+      {
+        let x := addmod(s0, 0x10a5a808c1e87595b41b0e17570d7147a0a55dbac94aef68834f1b3a941ab2af, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      {
+        let x := addmod(s1, 0x4aa86d9a044c4a06c864e83f703a167c4c2e4ac5e72ffe591dc87931050776b0, p)
+        s1 := mulmod(x, x, p)
+        s1 := mulmod(s1, x, p)
+        s1 := mulmod(s1, s1, p)
+        s1 := mulmod(s1, x, p)
+      }
+      {
+        let x := addmod(s2, 0x5e6ffc5983717789a37ebd999d54305521beb6c6c3afd2a98618aef97cee3812, p)
+        s2 := mulmod(x, x, p)
+        s2 := mulmod(s2, x, p)
+        s2 := mulmod(s2, s2, p)
+        s2 := mulmod(s2, x, p)
+      }
+      {
+        let x := addmod(s3, 0x4dfbc022ff8cb7d8e4c32aee1e62c0d3ca054b526a2691d8c23d62720285205e, p)
+        s3 := mulmod(x, x, p)
+        s3 := mulmod(s3, x, p)
+        s3 := mulmod(s3, s3, p)
+        s3 := mulmod(s3, x, p)
+      }
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 1 (full).
+      {
+        let x := addmod(s0, 0x747c576b0d01ea35754ba94a2674615e09160e96548b60fec7efde29d5b751c4, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      {
+        let x := addmod(s1, 0x4c1fcbe8323ac303eda90742641a33a47908be3486a3c1891d96b602c6f90cf0, p)
+        s1 := mulmod(x, x, p)
+        s1 := mulmod(s1, x, p)
+        s1 := mulmod(s1, s1, p)
+        s1 := mulmod(s1, x, p)
+      }
+      {
+        let x := addmod(s2, 0x6223770b8f411a82942cc04a9c33e076dae8bcd7fec09520f3e1c3119a72d639, p)
+        s2 := mulmod(x, x, p)
+        s2 := mulmod(s2, x, p)
+        s2 := mulmod(s2, s2, p)
+        s2 := mulmod(s2, x, p)
+      }
+      {
+        let x := addmod(s3, 0x3ffb7ca3060ead2fc74cff549213ec207627ff742f24a6aa39bda865ed3f6da4, p)
+        s3 := mulmod(x, x, p)
+        s3 := mulmod(s3, x, p)
+        s3 := mulmod(s3, s3, p)
+        s3 := mulmod(s3, x, p)
+      }
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 2 (full).
+      {
+        let x := addmod(s0, 0x533040ed7af316eae401a7fa0599f67e5cdac817111017c13f553c903ac184dc, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      {
+        let x := addmod(s1, 0x5800f5c2ce1904105cd6e27773d34b682a05db490e40ae565c17d1e813a27144, p)
+        s1 := mulmod(x, x, p)
+        s1 := mulmod(s1, x, p)
+        s1 := mulmod(s1, s1, p)
+        s1 := mulmod(s1, x, p)
+      }
+      {
+        let x := addmod(s2, 0x763104e9160e0ac97daab4b0989e2e97a6f4813c6f788a392222df3cda0df17a, p)
+        s2 := mulmod(x, x, p)
+        s2 := mulmod(s2, x, p)
+        s2 := mulmod(s2, s2, p)
+        s2 := mulmod(s2, x, p)
+      }
+      {
+        let x := addmod(s3, 0x1eedbe10e182e089613f0e5986521075fbc87ee346dd2c90348d0fc92a576658, p)
+        s3 := mulmod(x, x, p)
+        s3 := mulmod(s3, x, p)
+        s3 := mulmod(s3, s3, p)
+        s3 := mulmod(s3, x, p)
+      }
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 3 (full).
+      {
+        let x := addmod(s0, 0x0c000b898fd1caa93372b8575eacd30641c9ea6013b251ba52e10e7d4f22a90d, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      {
+        let x := addmod(s1, 0x76faa14231a6a9e926e26a11960b7fbef930b3d4f1387b44c99cf9b33551b740, p)
+        s1 := mulmod(x, x, p)
+        s1 := mulmod(s1, x, p)
+        s1 := mulmod(s1, s1, p)
+        s1 := mulmod(s1, x, p)
+      }
+      {
+        let x := addmod(s2, 0x59f835f292c6a7e97eb7f447b1b0fd798d93f47a7be681e0f73f6bad71378bea, p)
+        s2 := mulmod(x, x, p)
+        s2 := mulmod(s2, x, p)
+        s2 := mulmod(s2, s2, p)
+        s2 := mulmod(s2, x, p)
+      }
+      {
+        let x := addmod(s3, 0x1844752f94fd717cd9fccd4771f93e0389f3fa15a364e290365e46b146afa4ae, p)
+        s3 := mulmod(x, x, p)
+        s3 := mulmod(s3, x, p)
+        s3 := mulmod(s3, s3, p)
+        s3 := mulmod(s3, x, p)
+      }
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 4 (partial).
+      {
+        let x := addmod(s0, 0x70306a9330ade25056a061d2951e85158ce05dd8446a827a6ebfcc77623f4e0a, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x2caf3261ed23a29a5eed47dc7b79488243994adb7e38f5bb70f2a5ab08379730, p)
+      s2 := addmod(s2, 0x782f663b3b30c17b27f9f9b0666d06707b0611e5198fa9f64c585bbc6957fea9, p)
+      s3 := addmod(s3, 0x6f40a374c265d842ff044e54a6e333a01d91097e8c8e1f82451b4c12a1e1d458, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 5 (partial).
+      {
+        let x := addmod(s0, 0x0928f89b5e6c4c3a8d4fbb633f585cdd11e9173ee5ba3b16498f660ff5979ab3, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x4711f28aaf0f8d6049cd88d1849086bf8d3e4590f6e24dd54d70cf3e7371d3b3, p)
+      s2 := addmod(s2, 0x12452146935678d28d0e60fbbe14883f5e1f942aa342e5029281b1f3c4a0ee75, p)
+      s3 := addmod(s3, 0x0c0738a4c2aca29cb75601b72726c1482760e1573aa83eca35ee931b244ad06e, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 6 (partial).
+      {
+        let x := addmod(s0, 0x0d1f5bdc6a2caab353dbfb43c877353112c1564ccf8a418ffd02eef69426f5f3, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x46bfcab60337f91da2ffe7704ee764420fa7b0de23d11a37bd8280e0934204ad, p)
+      s2 := addmod(s2, 0x60ed4eb45dcb16d2d0105f85128d8713b29d5053c4ca36091bc10e87c2bad3dc, p)
+      s3 := addmod(s3, 0x01d794299b3847272399fb400fa7d9189cc7a240e2c90e58935de9cf2f23751b, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 7 (partial).
+      {
+        let x := addmod(s0, 0x3cf0f648151478b5937c390147d42207835d05de488911277464b4d861ffdf85, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x568c21b3a145be3cda14637a99faa19cb009246344b459240967cb577a5b490a, p)
+      s2 := addmod(s2, 0x45deecde60389ef7ebd79b58688afa4ee98bbfeb49cdd63b322f671fac39eb64, p)
+      s3 := addmod(s3, 0x76f8ee00ee166ec9071f0fc2da46f30071eb55a02414808e4d00f683efaa26db, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 8 (partial).
+      {
+        let x := addmod(s0, 0x37e422da795ef31fcb96dd94fae6b2384a44ff1bd86899b659b4963ffcf38ac5, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x329c772079f68377ffdbc2545092d05e0a12ee6bc9dd87761ce7608c9cf7a3b8, p)
+      s2 := addmod(s2, 0x3651ad2949a56c623d005463933b65dd6a3a0e7b410107b43746e2b5f2d8d9a6, p)
+      s3 := addmod(s3, 0x3d9fe0e0e23c88287ce056eb7f4fa2187f02a00a8d649b4d9ad40c65c16a4a58, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 9 (partial).
+      {
+        let x := addmod(s0, 0x3477555e8e065ac49f0b29a205a0a82fc822a5879706808380fefb8240410672, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x60b41d475f1c2b1ab7c9ab3f57d3fde4982fbfd234ba2d16057f7cac9f93b6c6, p)
+      s2 := addmod(s2, 0x230b856c5b1407f8966d3308b040c1356e78d920fd457cc19d9003afb2ed9e37, p)
+      s3 := addmod(s3, 0x72473f6e0dc12aefd85d3ed3b83964e811ca0507f8a59a7de1b5fd1f66f3be7e, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 10 (partial).
+      {
+        let x := addmod(s0, 0x18d8708131dd18e46e6640e4a4b983a8f9a6c21a807aa1b02a73c7e7ac930a32, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x41de0d94bcd1c0c7a6b31cad346423b12108d709a10d4e8dd57e8bc2e7ca7f66, p)
+      s2 := addmod(s2, 0x76972831434d1f0a47d1187108277a3f50a70e3c11986420591423dd923bbf93, p)
+      s3 := addmod(s3, 0x14253e4df4abe73b6fc4d5aa4a529ebed590a58de15fa0e1507d7b8c597676f2, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 11 (partial).
+      {
+        let x := addmod(s0, 0x07274e2c58111fd1a39c69667bbdd6839a63a854a802969971c5c452d94298a3, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x68872b94d9255f08762105915aa519db00a6763307cfc81860063b93c2dc70b6, p)
+      s2 := addmod(s2, 0x1057081c1fb46b7e66c049048ed281b27c159d1e9d6f51f9f638ceb5858d511f, p)
+      s3 := addmod(s3, 0x0ffe523b0b70bd74d8513835b8b078499379e51594b9cd09479e8b80c9b9a5f7, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 12 (partial).
+      {
+        let x := addmod(s0, 0x1065bb464f71fcf3e18c2ca424c45ab37dd0aa8a745a6bc7bd30b65eabc96b66, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x72406b1cdc74f4f10a8abd1872d445eec85db2937c829c225e99421cfc223acf, p)
+      s2 := addmod(s2, 0x6e87299ec40db317be7ffe0ab782996cf88e322c39316238c7e8200af1cccbdf, p)
+      s3 := addmod(s3, 0x46d0f4c86e5a8b4c9a1666a80d34b90e79da6219aa9b87a16dde2449f42dd13b, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 13 (partial).
+      {
+        let x := addmod(s0, 0x1b692b079ae4d26818d97db795b0fdb78812517009533701ed80d53b4ef0ac13, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x26bac7826b114bb0f94a588ea514d1c050c5189a0cdf96f8fc17389b249afea0, p)
+      s2 := addmod(s2, 0x43e3f721dabaf58a07acec73ce973e8248f7fd89defd6a91ccc931d3f9ee1bc2, p)
+      s3 := addmod(s3, 0x325b6f7e42533fa56632fbd38191941c9512ae351ba837d10d68f3df59ecdffb, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 14 (partial).
+      {
+        let x := addmod(s0, 0x7ba976f5364a9303a044ee6c4594189383f16023c31abcdb4200b80c50610d9b, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x68338859cb2ddf9c9a5c3f19a0f1ae43734891ab5b448f8bcd7790d6e4e58ffc, p)
+      s2 := addmod(s2, 0x3dcf8f2853337b15a2653df91c8832277993ade30c804a8fd383410dd9df1727, p)
+      s3 := addmod(s3, 0x0ae6a5d24135eb0f8585fda940ed0fefd0c483ee03bc48ad645619c180583f13, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 15 (partial).
+      {
+        let x := addmod(s0, 0x16e9c6c85c4ea4d16e5b3ea7da8371b56d9ea489784c4530d371970dd3f863a7, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x0d2846dfe73e7696035a8b1aee7577e9d0eca0e4797251c29159d10f0fd70c71, p)
+      s2 := addmod(s2, 0x39fa6c9d2da68c8f3154f3a65c1bdac9e2cfb15e3c2f633249244d0b39c00cd2, p)
+      s3 := addmod(s3, 0x7e6e55cdcbe6732a6e904115c159fc16b1cf3451dafda5b85d5cff919f84c242, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 16 (partial).
+      {
+        let x := addmod(s0, 0x2aa3caba1456ae2e5f49aebd093b27cf1513c5877aaf78df6812871617c441cf, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x03aa3a17d8fafd22c814dc7b131d7fdde95973b42d0cd378f9c051867b791ae0, p)
+      s2 := addmod(s2, 0x5e29306f87c44706191ab5df9ffd3e508dcc5d34994e740adb19cc28f1b40382, p)
+      s3 := addmod(s3, 0x3135c666812d81a2485d25c479df3e88852113d3fd484a87b3268cd8290af4d4, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 17 (partial).
+      {
+        let x := addmod(s0, 0x1adcd8255d50f3a6f671d056e3c1a13b5b63bc85e3d630f5fc2970ec35d15dde, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x4aa15530892c8370164dbd7fce431ea015b9ddd624317ef771037985d6bdb6d6, p)
+      s2 := addmod(s2, 0x36570f61f9022e18e1f12c03b28a328e0f264ecd1f287487497066f4c872ff17, p)
+      s3 := addmod(s3, 0x050d3e99929258a43d40b6600e34d1b72ce16abb6594ff5806e71a68254a4f91, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 18 (partial).
+      {
+        let x := addmod(s0, 0x6bd993cf9add04d62be2434b6e46008fc09b49964d5dfe8a4e99ca0e48b17560, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x57332924a710f70064578748ddb5d967f29f60f7e0acaa1c5a605603582e8739, p)
+      s2 := addmod(s2, 0x39d667b16944b0874c01e708efe4dee996a3360b1e4e20e1ae2a41bfb59ad2e9, p)
+      s3 := addmod(s3, 0x4241a6e535f2f442830351677094d0ae2fd405959b1ff2df8fb29db960f3228c, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 19 (partial).
+      {
+        let x := addmod(s0, 0x2a3455b6fb07506d3d150443f5ca97154843543c813dc19f0323db6150804fba, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x6055c1ba692f2ee003716679f65b29e7c149ad6fc2fea0296322571b2b4f408d, p)
+      s2 := addmod(s2, 0x44c0aac0880a50750af8581ee662f5612bec27abc01b4c98d0befdf450a68c56, p)
+      s3 := addmod(s3, 0x1ea358e4fb48914e60a2af61a72b90e53014bd0e21ca718712d7badbe342313d, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 20 (partial).
+      {
+        let x := addmod(s0, 0x1ceceea742614586a869b54736967d276bdefce133217288bfb7aa0155631836, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x1d856319bfb22b6b49091ac7bb52ab297fa8e8d5b3985d9f61384c314381fda5, p)
+      s2 := addmod(s2, 0x157a5a9d8ccc6639e416bae57db23998dc1de3093e51b0e925bdb9b9aad79e0b, p)
+      s3 := addmod(s3, 0x1dc1dabd80f377c4916cc5610d06ed67824433026692c3f8db58d1991b99d61a, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 21 (partial).
+      {
+        let x := addmod(s0, 0x3a4a25d37de3e0e50114dc45bca077ccf4f07ade9d9a0b7d7d9f2165644701a5, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x7798e03074f2c4b3d0a37ec36554f01e9884df8f2bb78d8d7ed0c801c4cb0e87, p)
+      s2 := addmod(s2, 0x44d8ba93336be2896a875c790f351c2b9a338494d25073aae385c6391be13898, p)
+      s3 := addmod(s3, 0x35ed81b4a0fd020fb7ed0e4a9405c9231b1321e93a4c586551ba0f385b329c5c, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 22 (partial).
+      {
+        let x := addmod(s0, 0x5d4e28ab2880862aea436baa3c63d7ff5f2f5925de29857c169bb69cb4ddb0d7, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x0d8a32eca97def46da9686fe1527c188b8b8592f2e75142e96f93e1f8253e085, p)
+      s2 := addmod(s2, 0x4bbce3013b069b21ad5c54029f4856b08c05e14263f28316988c9dedcc15edc0, p)
+      s3 := addmod(s3, 0x249fde7b162f803792d432d0e65a6c9ab78476ae000ea122f63d83c0e04c11a5, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 23 (partial).
+      {
+        let x := addmod(s0, 0x7513a9f978513e679fa1a42600aa9e9e1658982b897e7e6a53578fc7162a73f9, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x470bd387b5159cfc06b4b377bdfd060e5989ae3962fdd7ace96c73265ce180ab, p)
+      s2 := addmod(s2, 0x4c67e986e1301b95ba914de8fca66d8068d98d44ad0e61ec7b14282470542ec8, p)
+      s3 := addmod(s3, 0x3a6bdb9d8b8031af7a14a4e779edc904fcf4ad2efd4b5184b3d783fd32cc0cbe, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 24 (partial).
+      {
+        let x := addmod(s0, 0x47fc1d7bb8eccd979c1a0713a190bccdb466adbffdfa8f8d6e75ef2c3cfaf339, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x631d8ea485664f51e7a7ce6620f26620541582fcd962effe78e42bbbaeede320, p)
+      s2 := addmod(s2, 0x47e80f9d0f1ce71185941b377e617125577705a3caa22f4c641605bd75b10fcf, p)
+      s3 := addmod(s3, 0x15bb99682c07383d605bc803883ce349ab6a48e77bb5b9803cf21aeecd45f0b9, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 25 (partial).
+      {
+        let x := addmod(s0, 0x3abbf07fedcb9b85a68d4fe365fe01a1bce3245fce8bf3ee0a5cc10b3408a244, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x74e2d8ee026f12926b17077761657ade193b90638ab5987d8f78b9348beb7f63, p)
+      s2 := addmod(s2, 0x2c042ab0b9a31926b13d0aa9802ace64038cb06df784ccf521c841c5bc1c38b0, p)
+      s3 := addmod(s3, 0x47e3acf514aedf841abeded910ade261e178dd22f7bf711e9a686804e3b99c40, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 26 (partial).
+      {
+        let x := addmod(s0, 0x283ac6b5bb02777d92fedf81b3e6b2c04ac75523a7feec48a26a86001c926373, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x02e2904962a55be79e7fabb6bc378414d646a614f6d5b92f3a5beb271b21f548, p)
+      s2 := addmod(s2, 0x513c8ac60b772cbaece9dfa993ff707b2f106195a1382f193995bf8aa87d810e, p)
+      s3 := addmod(s3, 0x71806fe3aa718f7ec310ccd9c044becb3dc4e20282eb2137a9eb80e111b8a30f, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 27 (partial).
+      {
+        let x := addmod(s0, 0x4269dfd64ba1d1acb747cc1964c7e4af170cdcab5acbd56ec0162983ea976fb1, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x4e63862c400d6f4094ec9876f8361695d3c40c56ce798ebdeeb5f2f39bfdc3c7, p)
+      s2 := addmod(s2, 0x75edf3e14a454db344a0b9558568aa28f38b1d5b9573c3e19991742810e34b87, p)
+      s3 := addmod(s3, 0x46227418d803118e5eb157693c4bfe125ea5017c7d76bbf7d382f8c5af21500e, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 28 (partial).
+      {
+        let x := addmod(s0, 0x67e0a66325291e8e3dcb889175b3023c765ab2b39e7bfbcd132ea04f2fce9da8, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x597fbfb99377a2a674d610ba6f357e8b477a41e25434b9b13519cdfce195a940, p)
+      s2 := addmod(s2, 0x0d4db15167257de3e183a79c238609bb99366a9aa2ccd2da110f945cddbf2c97, p)
+      s3 := addmod(s3, 0x46ae59b94da2b952186c1de4a77851064b836ff5552ec35750abc7eaba0a1fa3, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 29 (partial).
+      {
+        let x := addmod(s0, 0x712ee40b042940e9b734b209a8cd3c7a642c2e9d7bb4248a8e3bf778e8c7c485, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x7987736deb414323075bc0f28773b883b9d21a55abc72f768eed142c5d4c7373, p)
+      s2 := addmod(s2, 0x5e122670f9e8e0a87f3acb3252a8af295c42b187f6b1fd7eb5cacf462a0ee33d, p)
+      s3 := addmod(s3, 0x1b3df60a842eed572df4430ed00ec4539fa939f99c118f1992a5553bf4a4765a, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 30 (partial).
+      {
+        let x := addmod(s0, 0x79b1a3e3f83936155bfd09a46b2e85336568c79f591e3197a51e21783aca46ca, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x04de05c385d031d1bac9e3913227022afae2503de27142b6d0d89492d677d0ef, p)
+      s2 := addmod(s2, 0x5efb7a428cc6ffcd0087e397429639984c98e47bc8ff6516a080399d73164689, p)
+      s3 := addmod(s3, 0x7dddedcad75de82b4d957c6eacb1260192cc47d25b57130c30a3fff2e1f38046, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 31 (partial).
+      {
+        let x := addmod(s0, 0x42b4aae4eaf33f7c64810caf49225227f4c55d11736d8d2c3cc44f0187c492c0, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x0a507366fdeb2eaa05458811896bd022df9e30b42a1b2d1e4a434a6239b2e5f6, p)
+      s2 := addmod(s2, 0x574acc57d79808120922ce651c3e39343f62d622d625c0552279be819125b9eb, p)
+      s3 := addmod(s3, 0x5027a0d4b627b0f698e50d50106189cbb2bba34da8c6070ad48db3232a27e1b4, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 32 (partial).
+      {
+        let x := addmod(s0, 0x3a3fee72dd3af6c7472bef1b9a678c2eb96d90dbfef7e6d92cbd241320d957a4, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x52b77bb7c679f5c4697ea5a758f39fad667cbcb237f6a18d95d0d53aa13881dd, p)
+      s2 := addmod(s2, 0x4f79c2e6b2893bb429b000eec66452d562a98c702784ea36b811da68fd96f77a, p)
+      s3 := addmod(s3, 0x5cdf75a3fe2721a833e6559a085994a6847dc5e85ac13ff7570b194af338fbff, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 33 (partial).
+      {
+        let x := addmod(s0, 0x0a4aa64a5923f7ca0b05d4acab782fd4691613e9b31db22a976263ee136e3f39, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x19cb842d813f19c3374f9efd30b0c084d19aa361b72c4606fedf6fe5108326bf, p)
+      s2 := addmod(s2, 0x60a4fec6a7a615f55760273d87581d420962bc58b3a3c955cbf74a096390c6c3, p)
+      s3 := addmod(s3, 0x42277127b024dd5dea44600fa60e9c8b1f37a2951d167cb460f9eade0ebce1a7, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 34 (partial).
+      {
+        let x := addmod(s0, 0x3e4a9b355fc05e96c7242df61cf9b868993690d9e6568057cc4463683ac51591, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x178cb31b54f6f4cba879a4db4448c9a8a4df913891de95b462ee13b248d60f46, p)
+      s2 := addmod(s2, 0x2bacb962e79636360c6960cf0e79d4c06406e96de3b44a04a387c14842a8a305, p)
+      s3 := addmod(s3, 0x2d80bfea51ed8d6c8cf132b1fc4eef4760dad1667905d07d178d982a08a96360, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 35 (partial).
+      {
+        let x := addmod(s0, 0x23bd972f00e045640b94d4d81d713e78e13305d1b561bcd5e7e7f800fc376be8, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x79403cadaf81083b4680465e0242457b275f62ec6a1aabfab95ea4f85b4dfb3b, p)
+      s2 := addmod(s2, 0x0da133b77dfd8d07ae1b39ccea4c38887a43efd83cd9c7b39f52841644b99acd, p)
+      s3 := addmod(s3, 0x1a483a4828cfc7203e5f9999399a4291c317eed169200e4cc5a0f3501e826e03, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 36 (partial).
+      {
+        let x := addmod(s0, 0x2eefd37e36c8a23ce4aaae906df9dac0b4159b577a430fe07d9bb04aecbd14c5, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x22fbb43c1d1e3bddc39f342216c3accbc22223bf486776cad083eb897f0aa3c3, p)
+      s2 := addmod(s2, 0x26a1e6c643077adc195be56e3a6aace0dc31f75bcabb75f943ee6000697c33dc, p)
+      s3 := addmod(s3, 0x54e15f92b89b8c24e805bd5a8e10a7fd9cd45606e8127a81d2c4841db7c94404, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 37 (partial).
+      {
+        let x := addmod(s0, 0x48369ce34441cf0fc0b617e42bf507c5dceb28d444cc79893051aaac25ba4508, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x217f9911ef244ebf0c0aea706cd5cd3f7837b11c823af7e64b22ad8f30f53ad8, p)
+      s2 := addmod(s2, 0x1db1e5f4bf15a3ac12ec51c31850fccb04783a17ce0fcd0024345ab51d4ceedf, p)
+      s3 := addmod(s3, 0x7cca89f7719dbc83241b7b3abbe72ca7406db34383c9417e66796a061e338143, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 38 (partial).
+      {
+        let x := addmod(s0, 0x75e221dfa6555dcce187bef581a8d03e2acb096487a08d71227f91b6d05467e2, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x45a82d66139b7193c0c38b8fd1b2c269f45ab952417db706cadedab0d1772b10, p)
+      s2 := addmod(s2, 0x076a99f400c94cc249a85c7c662f97b06df753b0fc7f9442e4a99cdef2372b15, p)
+      s3 := addmod(s3, 0x42e17762216e8b514ef08ab36364442573b7094e31b6ef2c24523221c667eec6, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 39 (partial).
+      {
+        let x := addmod(s0, 0x144014cac12a782bcc87cc0e9c07e77e9a0337e14530a84a9c3879b0b5a22a3a, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x7a7287af5b4e37b8bf203caad209a61965021c5b70568c808117df04a8fe0fd0, p)
+      s2 := addmod(s2, 0x204c3d499d04b78cfa0ebd69171258c0a17acfd32b257feeede3809482a561b2, p)
+      s3 := addmod(s3, 0x1a4784bd1ab25b3c9a1414bacdbb61e28d03ff28c4d15cc8d620b56458dc69b2, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 40 (partial).
+      {
+        let x := addmod(s0, 0x0de7b013bbea9de5c0984e4b820e9bd8c678d50d2b5129aa1a8676fe99d604ca, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x6a0982ce23bfcbc825717c01b3f367378688455017ac5ff7b6f1bd81698af4c5, p)
+      s2 := addmod(s2, 0x0a5c2b5a9d548b32552934514c754b43b458d2415caa1ecf3b8c83c4afc2d1d3, p)
+      s3 := addmod(s3, 0x64913cfb6ceb93cc99ce086e1bd08868d14b2c39bcec4f640cca065e578d7b94, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 41 (partial).
+      {
+        let x := addmod(s0, 0x1a8f7454d6f8f850c4314ba190d272a6661c7b985a414d3f5ce59afeeb338cd7, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x500d76a5eb5e8bc2f9cd85f591d38bf98c6ab1f06d32bc527cafa362acf2e4f4, p)
+      s2 := addmod(s2, 0x6106491fe9e5f6f9b0fbfddebfed3c588da2fc28553c14a14a9f1db7e7d5fd0a, p)
+      s3 := addmod(s3, 0x6eb8857f44b4f1d50b371e1f4e58500be85d3b8178132109d3b713e432814539, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 42 (partial).
+      {
+        let x := addmod(s0, 0x1c8deed865a5625d1abc693ed466860b95cc93ab6a8db255100cfaf5cedbfc8f, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x4e3aedfe2342db019dac1a80de8249d5d0162fff31eb50951aff2bd84be359c0, p)
+      s2 := addmod(s2, 0x1760c205003c470ca0f5e93ebc5972cf1d73a205b78e591461ff53f77d94dca3, p)
+      s3 := addmod(s3, 0x70c29c513ab566d02747a2afa282e3da87375756f0c6ade210ffb0cdc9373e6c, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 43 (partial).
+      {
+        let x := addmod(s0, 0x6d2e8e553a65fc906045a824abeea7cf62afd24116c57a086a25421d6ace278a, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x1801d984076653a1c6023bb86cc3d5445ff3b2f5f93f811d89330708008fe080, p)
+      s2 := addmod(s2, 0x2f8fa6d716cd0c7310df3c98c180b448882a7b286a056fa7c7a53f6ed51db8e9, p)
+      s3 := addmod(s3, 0x500ae85c7b596c47bc144d36ba2dede90f011fca08435fbc84fe50a0fe400501, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 44 (partial).
+      {
+        let x := addmod(s0, 0x5e75cee514931759603a1567caa004f4c79f46de54e16dd7b37013d48bb0da8b, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x41adbf23110f17690e59ee4c1021b8df4c620ca6fcf303660e7b320758a3ed80, p)
+      s2 := addmod(s2, 0x55b00b7b85bd7337a5d79097d3ae6855872e9242536c7da04a71548680a92356, p)
+      s3 := addmod(s3, 0x2807d23ecc530d7a215f9f7520bb6a42bfc42f213851a156f800f98adac81bdc, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 45 (partial).
+      {
+        let x := addmod(s0, 0x2047e500e0e9d23866b4cd46ea62174464c8f7e041566a63875fa0054a3c3c0c, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x3630fd68cc3457e4c17eb1df214be3899a3f69d1c79f1060422b7fe7d6a57557, p)
+      s2 := addmod(s2, 0x6252cb5c7a020f9f4e6808125ee03fa8793068abc16317b76764f88f4830f727, p)
+      s3 := addmod(s3, 0x468766e11ab4faa35470db3b2da9e9fbf9e86f4b0da9516aa29509a964f9b49f, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 46 (partial).
+      {
+        let x := addmod(s0, 0x7243bc20f8c36d57ea927a3064f5929ee1d814866f371588a1dce4ec4ad58891, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x61165b8a2151bf6462da8c924d825e97f18ed88388858cb68516ae97e42849c4, p)
+      s2 := addmod(s2, 0x4e0cbc02c4f66df27f25e57b977ce3dcd452cc25db3750acc0707d67e2eb04da, p)
+      s3 := addmod(s3, 0x2c2ee47deae2feba2494bddfdfac4c63fedb9eb149e2ba01a07bd9b9790b1143, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 47 (partial).
+      {
+        let x := addmod(s0, 0x728d83d00ed09850dff7afb8ef85badfe061d1416d827845f31ce57959ed3679, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x55e1ef485be54cf044cdcd8d6bbdebd3d73609963db74ac8c6ba6b7bddc3b533, p)
+      s2 := addmod(s2, 0x6f912be317052bd2104e21b9417e8e4879b80ac32c32693137fa850754cdd853, p)
+      s3 := addmod(s3, 0x68760ec38239ee15fb78dba5a22ff8bbb9509e58681d283969ee359a5e0fa132, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 48 (partial).
+      {
+        let x := addmod(s0, 0x1d7d98becd42708c0d4d88ff31b8e882f08baa95b822a477b366a291ec6a14df, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x053649d1cf4614464f0ff21c2e6793f131cf515d1efb554c22299672f91f8e75, p)
+      s2 := addmod(s2, 0x0013e345907448423dfd6d38a6bf00431d72c0fbd0c3f4e675f84a64b2186240, p)
+      s3 := addmod(s3, 0x35a4aa5cf84e28562634d9f4ed85dde2a68ea640b5d7d47713d5ea823b0c0df3, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 49 (partial).
+      {
+        let x := addmod(s0, 0x217b80f46b546d94a46d25418c9c7d659e73aa14b53b0df7f1bfcf3cf3d4a2c6, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x317713e80c35c20a8775955b4d60edaa055b5d5bd2ce73d2aaec76f9b51a6f8d, p)
+      s2 := addmod(s2, 0x334718f886591420bdcd2539109b3d24e74d08c6b5dabdc54ea73670c4635074, p)
+      s3 := addmod(s3, 0x204d473acfd40f93a7aa0d008f3a0236cbb1d07010a99131c19894b35857a3d2, p)
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 50 (full).
+      {
+        let x := addmod(s0, 0x1651c673af49f74e8b4890ae7aab78686b49ed216df597c5027cc975b01f0de9, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      {
+        let x := addmod(s1, 0x4792f47c6af7cb649a7732247ccabca2c82538361f7227c48963d71e5fcfdace, p)
+        s1 := mulmod(x, x, p)
+        s1 := mulmod(s1, x, p)
+        s1 := mulmod(s1, s1, p)
+        s1 := mulmod(s1, x, p)
+      }
+      {
+        let x := addmod(s2, 0x1cf0ccb0532dc1a3abf2f97a52c9b8ab439055e9c572a317016d7e0f80f4fec7, p)
+        s2 := mulmod(x, x, p)
+        s2 := mulmod(s2, x, p)
+        s2 := mulmod(s2, s2, p)
+        s2 := mulmod(s2, x, p)
+      }
+      {
+        let x := addmod(s3, 0x1287061c8913769d2444a78f104efc30ec317486c1f2d3624b821c5b4f0f24c6, p)
+        s3 := mulmod(x, x, p)
+        s3 := mulmod(s3, x, p)
+        s3 := mulmod(s3, s3, p)
+        s3 := mulmod(s3, x, p)
+      }
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 51 (full).
+      {
+        let x := addmod(s0, 0x3171de7d7e9091d286c94ae02beb3d382e8efdef398627c3bdd221ee835f51d8, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      {
+        let x := addmod(s1, 0x7e0370626e8a5f71879d82c740814be3dcb02e16535b8c656e5e9e93c4a1c1ba, p)
+        s1 := mulmod(x, x, p)
+        s1 := mulmod(s1, x, p)
+        s1 := mulmod(s1, s1, p)
+        s1 := mulmod(s1, x, p)
+      }
+      {
+        let x := addmod(s2, 0x02525c27d42c67273f54a8ac5b3fca705233bbc8333f90b613a9f13918cd75a9, p)
+        s2 := mulmod(x, x, p)
+        s2 := mulmod(s2, x, p)
+        s2 := mulmod(s2, s2, p)
+        s2 := mulmod(s2, x, p)
+      }
+      {
+        let x := addmod(s3, 0x50c197282fe4b2f50fd0407de40c3dbc4eb4502c96aef573333910d8f57e41a2, p)
+        s3 := mulmod(x, x, p)
+        s3 := mulmod(s3, x, p)
+        s3 := mulmod(s3, s3, p)
+        s3 := mulmod(s3, x, p)
+      }
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 52 (full).
+      {
+        let x := addmod(s0, 0x2c55d2424117cadbb080a75dd0d154b81ee0eabf58240637ce5e467de79118f1, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      {
+        let x := addmod(s1, 0x5b021d5a407f4994a13f2466b70620557cf00fa0210b13a10f38e76808361d3f, p)
+        s1 := mulmod(x, x, p)
+        s1 := mulmod(s1, x, p)
+        s1 := mulmod(s1, s1, p)
+        s1 := mulmod(s1, x, p)
+      }
+      {
+        let x := addmod(s2, 0x0a7e8b45811e89674e2353767affdff999253eb182f85cb84494366449200765, p)
+        s2 := mulmod(x, x, p)
+        s2 := mulmod(s2, x, p)
+        s2 := mulmod(s2, s2, p)
+        s2 := mulmod(s2, x, p)
+      }
+      {
+        let x := addmod(s3, 0x6f480c13c2f1a81c497caccd60dfaf6624389253428a0195059b8db0f003e6e7, p)
+        s3 := mulmod(x, x, p)
+        s3 := mulmod(s3, x, p)
+        s3 := mulmod(s3, s3, p)
+        s3 := mulmod(s3, x, p)
+      }
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      // Round 53 (full).
+      {
+        let x := addmod(s0, 0x64e9328f648347ce9b0f08b33fe212518b1dc73ce19e26c7e45951c13a3dbe46, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      {
+        let x := addmod(s1, 0x68cf16fb31b8d8f441266ba1f9b0f031d6e4261327fde45d12a3cf910c546b82, p)
+        s1 := mulmod(x, x, p)
+        s1 := mulmod(s1, x, p)
+        s1 := mulmod(s1, s1, p)
+        s1 := mulmod(s1, x, p)
+      }
+      {
+        let x := addmod(s2, 0x572ef3f50c7a27f5d476775725b8608c583f2b8513a00ac3fe1e7fca5220aa27, p)
+        s2 := mulmod(x, x, p)
+        s2 := mulmod(s2, x, p)
+        s2 := mulmod(s2, s2, p)
+        s2 := mulmod(s2, x, p)
+      }
+      {
+        let x := addmod(s3, 0x49cd286880eeb72e3b59abba027f9bbd16b2d25a061046fcf2e1d6274cddef4a, p)
+        s3 := mulmod(x, x, p)
+        s3 := mulmod(s3, x, p)
+        s3 := mulmod(s3, s3, p)
+        s3 := mulmod(s3, x, p)
+      }
+      s0, s1, s2, s3 := mds(s0, s1, s2, s3)
+      mstore(add(state, 0x0), s0)
+      mstore(add(state, 0x20), s1)
+      mstore(add(state, 0x40), s2)
+      mstore(add(state, 0x60), s3)
+    }
+    return state;
+  }
+}
+
+/// @title Poseidon1T5X7
+/// @notice The Poseidon1 permutation over BlueSky with state width 5 and S-box x^7.
+/// @dev Matches `permutation::<BlueSkyConfigT5X7, Scalar, 5>` of the `starkom-poseidon` crate.
+/// @dev There are 4 full rounds, 46 partial rounds, and 4 more full rounds. Every
+///   round adds its 5 round constants, applies the S-box to every element (full rounds) or
+///   only to the first one (partial rounds), and multiplies the state by the MDS matrix.
+/// @dev The round constants and the MDS matrix are hard-coded rather than stored, but they take a
+///   large share of the contract size limit, so this library must be deployed on its own and
+///   linked by its users, e.g. through `Poseidon1Sponge`.
+library Poseidon1T5X7 {
+  /// @notice Applies the permutation to a state.
+  /// @param state The state, every element in [0, p). Elements outside the range are reduced
+  ///   modulo p by the first round, so they alias canonical ones.
+  /// @return The permuted state, every element in [0, p).
+  function permute(uint256[5] memory state) external pure returns (uint256[5] memory) {
+    assembly ("memory-safe") {
+      // Multiplies the state by the MDS matrix.
+      function mds(s0, s1, s2, s3, s4) -> n0, n1, n2, n3, n4 {
+        let p := 0x7ffffffffffffffffffffffffffffffe0673ddf29e9b5547c000000000000001
+        n0 := mulmod(s0, 0x4f1a7edac0091dc07294b25cc35804255c5c5c0e9d87cfb09b2ca16ff4e3f8d2, p)
+        n0 := addmod(
+          n0,
+          mulmod(s1, 0x2e3fba56abe8b79e227eb9d8df3a24fd8168ffd168c0cf97ca44bc8e614c188d, p),
+          p
+        )
+        n0 := addmod(
+          n0,
+          mulmod(s2, 0x560c37d94be465974ba0427608bc3581300c3535658f31cecf3848c97187d30b, p),
+          p
+        )
+        n0 := addmod(
+          n0,
+          mulmod(s3, 0x160408e52b4621d63c58f59ceac1ff2643cf8f4f0b58b218837b12b4284c8842, p),
+          p
+        )
+        n0 := addmod(
+          n0,
+          mulmod(s4, 0x3e5f5b47cb972959bdfd9815cff3a0cd86d6d8bc78c2e0046ac1dec6b2c39c64, p),
+          p
+        )
+        n1 := mulmod(s0, 0x2ba51ea5e1f4af35e0fca471293ad50907754e5dfea878a6f95b77e2a990de34, p)
+        n1 := addmod(
+          n1,
+          mulmod(s1, 0x1561b0f0587bfdcd78db5e7f7ab86e66267b558118e815345398fbe921d0bc7e, p),
+          p
+        )
+        n1 := addmod(
+          n1,
+          mulmod(s2, 0x12550a117e361bc311c487a7a2ae5fe7c5ecc24241558c5c51bdf0431a7a8e9c, p),
+          p
+        )
+        n1 := addmod(
+          n1,
+          mulmod(s3, 0x155574f5da51ffe8c4f8f479920709a630b16c71cd25b5e5b3bb6dc1edbafa5a, p),
+          p
+        )
+        n1 := addmod(
+          n1,
+          mulmod(s4, 0x4db311dcc5b5181f1ccaf530ccf439042555fd5a64f22ac8bdaf98bc60e03e42, p),
+          p
+        )
+        n2 := mulmod(s0, 0x7c1a14e313f5b0f5ee9cbc91d09c94f00cadd464ece044f5a069aeaa2e958145, p)
+        n2 := addmod(
+          n2,
+          mulmod(s1, 0x0cbe0717bb862cdb6ffb08f6a6e5c32d902e1fb6c0bf98ced1cc3f58317e899f, p),
+          p
+        )
+        n2 := addmod(
+          n2,
+          mulmod(s2, 0x1ff492e247920dc8c588bf676a5d9a1cbea93cd913e6995ccdb1ac5500e1dae8, p),
+          p
+        )
+        n2 := addmod(
+          n2,
+          mulmod(s3, 0x4af0ec5dfda9a431640a4f5173042c3939041b5af353a6d9fd0c5e7c2dc91fcc, p),
+          p
+        )
+        n2 := addmod(
+          n2,
+          mulmod(s4, 0x6f0999a2140bbaaa185bbf646e72206a1ca997460794c46e413a1453aa1dbc66, p),
+          p
+        )
+        n3 := mulmod(s0, 0x6abb9d8f38b21e7202a7be956fc6f81313bf3fb1958cdcb6a3103bbc66c752d5, p)
+        n3 := addmod(
+          n3,
+          mulmod(s1, 0x6ca89dfb7a5a14654f281b9adb1cadd9ad0492422bb83e28d65f2fadc82f5730, p),
+          p
+        )
+        n3 := addmod(
+          n3,
+          mulmod(s2, 0x404e922265d0d00696c2f16951bdf998c599ea51c738ad89747d18bf63a36a87, p),
+          p
+        )
+        n3 := addmod(
+          n3,
+          mulmod(s3, 0x15705859f233d104b9237f486235397141c894a4f3a68e1cd52fe7f9665f7443, p),
+          p
+        )
+        n3 := addmod(
+          n3,
+          mulmod(s4, 0x118481854f15898fe3d45e393e62e8b724f078092b69b4e63decc8227cfb2b15, p),
+          p
+        )
+        n4 := mulmod(s0, 0x6cb25d9af6073226b4e12655f1577c51f156b33a985d9210b0174d7fc91d4526, p)
+        n4 := addmod(
+          n4,
+          mulmod(s1, 0x0f95219220e2163a5ea5f9d442bb17a7e4c671e02eff2f9005cd2df9d02b0354, p),
+          p
+        )
+        n4 := addmod(
+          n4,
+          mulmod(s2, 0x24640a13a79c92c7c8bef0b9445b04c4302afa7588246053fc5d319a6507d84e, p),
+          p
+        )
+        n4 := addmod(
+          n4,
+          mulmod(s3, 0x54c0e1efac2e13188b31202ced2f7cc60dd37318fdf46bdd6eac790199ee3bb1, p),
+          p
+        )
+        n4 := addmod(
+          n4,
+          mulmod(s4, 0x39b89233cfbba28ab9932b80f20cca7a7ebefcaa454b3c11285ec42c9131a73f, p),
+          p
+        )
+      }
+      let p := 0x7ffffffffffffffffffffffffffffffe0673ddf29e9b5547c000000000000001
+      let s0 := mload(add(state, 0x0))
+      let s1 := mload(add(state, 0x20))
+      let s2 := mload(add(state, 0x40))
+      let s3 := mload(add(state, 0x60))
+      let s4 := mload(add(state, 0x80))
+      // Round 0 (full).
+      {
+        let x := addmod(s0, 0x7a136d618a676eb934c6bd3867bcf120781c88f22f33558c8acc6bf665cf4729, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      {
+        let x := addmod(s1, 0x2a1550c5b5306fac0010d5299e76fed38a17ae00e0fa56bd45cad1c6e3aa6fe5, p)
+        s1 := mulmod(x, x, p)
+        s1 := mulmod(s1, x, p)
+        s1 := mulmod(s1, s1, p)
+        s1 := mulmod(s1, x, p)
+      }
+      {
+        let x := addmod(s2, 0x08026671e3ea01064b13234466ca425fef01d81f08ee916b8937bf2c6f4bc90a, p)
+        s2 := mulmod(x, x, p)
+        s2 := mulmod(s2, x, p)
+        s2 := mulmod(s2, s2, p)
+        s2 := mulmod(s2, x, p)
+      }
+      {
+        let x := addmod(s3, 0x55ff8cd03ecb2b5f823c4451bc77836f12308fe3f4f4749ea1ebc5aa6c03d891, p)
+        s3 := mulmod(x, x, p)
+        s3 := mulmod(s3, x, p)
+        s3 := mulmod(s3, s3, p)
+        s3 := mulmod(s3, x, p)
+      }
+      {
+        let x := addmod(s4, 0x2dfaa3dea1cd73055260f4200481f52731d8e46445c0cb4116ef71d71e743c0b, p)
+        s4 := mulmod(x, x, p)
+        s4 := mulmod(s4, x, p)
+        s4 := mulmod(s4, s4, p)
+        s4 := mulmod(s4, x, p)
+      }
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 1 (full).
+      {
+        let x := addmod(s0, 0x33cae63bb186c2b5bb6b3cd6e520253ad8a638691d19fd9671f633b92728154b, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      {
+        let x := addmod(s1, 0x1d7666e68a3602ca08e492497c4d0ec3ac9394ac2ad7640627e048be1533a1e7, p)
+        s1 := mulmod(x, x, p)
+        s1 := mulmod(s1, x, p)
+        s1 := mulmod(s1, s1, p)
+        s1 := mulmod(s1, x, p)
+      }
+      {
+        let x := addmod(s2, 0x65b961c42e3a1d0a11768c690884f3f63afe1de3eb989dc550bcb9fd7d57b9b0, p)
+        s2 := mulmod(x, x, p)
+        s2 := mulmod(s2, x, p)
+        s2 := mulmod(s2, s2, p)
+        s2 := mulmod(s2, x, p)
+      }
+      {
+        let x := addmod(s3, 0x2ab4d7a7d229f5d54ecff065a91e02c640ff7f19dfb7516bdd965cc8708f1fb7, p)
+        s3 := mulmod(x, x, p)
+        s3 := mulmod(s3, x, p)
+        s3 := mulmod(s3, s3, p)
+        s3 := mulmod(s3, x, p)
+      }
+      {
+        let x := addmod(s4, 0x6d9bdd1decda75800de1ae936576575a0ce76084b6ffcce857eaf3c40b236a82, p)
+        s4 := mulmod(x, x, p)
+        s4 := mulmod(s4, x, p)
+        s4 := mulmod(s4, s4, p)
+        s4 := mulmod(s4, x, p)
+      }
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 2 (full).
+      {
+        let x := addmod(s0, 0x0dbf35abc86ea36a9224d668bf02a9b6b1b0d29c6a1b827d1e6e53951f752586, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      {
+        let x := addmod(s1, 0x1ccfeb4c4aca23c992d0f7b27a53c5cf5ad60def02b2af2e28e55829bfd50533, p)
+        s1 := mulmod(x, x, p)
+        s1 := mulmod(s1, x, p)
+        s1 := mulmod(s1, s1, p)
+        s1 := mulmod(s1, x, p)
+      }
+      {
+        let x := addmod(s2, 0x08e413c98dd10babad180e4a10e212a46142343e044d66b45ab8fddfb282287f, p)
+        s2 := mulmod(x, x, p)
+        s2 := mulmod(s2, x, p)
+        s2 := mulmod(s2, s2, p)
+        s2 := mulmod(s2, x, p)
+      }
+      {
+        let x := addmod(s3, 0x4d72533dce0cce76a78c4acdd5b47e2fcf02b38da6b23491cdb8be166fec6734, p)
+        s3 := mulmod(x, x, p)
+        s3 := mulmod(s3, x, p)
+        s3 := mulmod(s3, s3, p)
+        s3 := mulmod(s3, x, p)
+      }
+      {
+        let x := addmod(s4, 0x5db549d3e88f6cc416c02e342df795bbf94d1069d0044739fc39c70398af358d, p)
+        s4 := mulmod(x, x, p)
+        s4 := mulmod(s4, x, p)
+        s4 := mulmod(s4, s4, p)
+        s4 := mulmod(s4, x, p)
+      }
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 3 (full).
+      {
+        let x := addmod(s0, 0x43fa3b0e231f5511c4ba6e7c3e99146d04f49e234309326b4ff3a4933f9c9469, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      {
+        let x := addmod(s1, 0x01c5804b34dc3eed06bac3eec2420a850a60aa50726be5c8e0a6c1c0c66ff9c1, p)
+        s1 := mulmod(x, x, p)
+        s1 := mulmod(s1, x, p)
+        s1 := mulmod(s1, s1, p)
+        s1 := mulmod(s1, x, p)
+      }
+      {
+        let x := addmod(s2, 0x7e7fac442fc4837d07d95b5517f04b8c7ad39fc51d7d5237d14b469118206b9a, p)
+        s2 := mulmod(x, x, p)
+        s2 := mulmod(s2, x, p)
+        s2 := mulmod(s2, s2, p)
+        s2 := mulmod(s2, x, p)
+      }
+      {
+        let x := addmod(s3, 0x4065d8bb6728a6b8b61b4f6a70abf4db11c40aa7463457cc4df4312144dc1302, p)
+        s3 := mulmod(x, x, p)
+        s3 := mulmod(s3, x, p)
+        s3 := mulmod(s3, s3, p)
+        s3 := mulmod(s3, x, p)
+      }
+      {
+        let x := addmod(s4, 0x1fadc1bd093ab28d081f6e48d08e83b194ecfe4ecfd6cf8591649e29603d13f0, p)
+        s4 := mulmod(x, x, p)
+        s4 := mulmod(s4, x, p)
+        s4 := mulmod(s4, s4, p)
+        s4 := mulmod(s4, x, p)
+      }
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 4 (partial).
+      {
+        let x := addmod(s0, 0x3b0343e8a38c4975b54cae2c75ba34dec93a5c8a07d721c8dc25f2cc59a9ae25, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x3081c1ccbee58fe9e7446748924a43e83dffa7927ed32e8e9c9beeb8760340ba, p)
+      s2 := addmod(s2, 0x1e100233b0d32d682b7effda0d610b7aa58d367e2653587c1b5548020ce9832e, p)
+      s3 := addmod(s3, 0x2136c6b815a704e89f628c73b5166c604e75e8a048073e3892250931a42698f9, p)
+      s4 := addmod(s4, 0x6c5493d75e33b9de3eb2c33b2767240afece216f087697ec9158727cbddb847e, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 5 (partial).
+      {
+        let x := addmod(s0, 0x7152f72d488bf8a6ea4199ea2270af7bc7f24e95365d66d3a198f930d2e37bdb, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x20373f4acb8b83d6638c81eaa121813ff53790bac05b95e5b3cb0fbeae2eb959, p)
+      s2 := addmod(s2, 0x1b21c4690dbba3012ad27f027a57f1bc3f7ad08a8041bb63dcb78aba69f92085, p)
+      s3 := addmod(s3, 0x3f920f94ff5bb3f3518c9a60e72719fa0ef5652d085c067240fdb71d2ccb2134, p)
+      s4 := addmod(s4, 0x6143e5cab49d3f5181a362846a34fdb84e4a1699d207fa43509cfe2f46ba813b, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 6 (partial).
+      {
+        let x := addmod(s0, 0x00dd294ad41814d8bc73c0ca5676490a6b52fac63ffc4acc8f2af31100339471, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x11dbdf5c8757dc0137f63d0bb518cc7395abf691b664f08e3c4835969114596f, p)
+      s2 := addmod(s2, 0x66d3a1d7ad7612b4a3ec40459bf25930d0c74d9c8946fe6bf9d133e7947440ac, p)
+      s3 := addmod(s3, 0x559a16ba4e68c1c9fc02ddb23da1a9ab0b650fece380d2383e71141a84caa896, p)
+      s4 := addmod(s4, 0x6dbfd8542f1fd1b4fd548d1edbd86468e48d6fb1f549b1af414829b8913a1530, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 7 (partial).
+      {
+        let x := addmod(s0, 0x6f001110425f320ee2449e41c17acd81bc22477d717672b05b52f104dbff005c, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x6398b3695a948f006da742d38aee20f1c2069cf12c65979c1cc3a3522292eb82, p)
+      s2 := addmod(s2, 0x5630202c4241c406561f8d9086f85e8d17c4e3b50e0957f268ce89ee945f244f, p)
+      s3 := addmod(s3, 0x1960fd7ceb51c248b12070cd786de2e890ac59f56cf8901b8687870d53422b2e, p)
+      s4 := addmod(s4, 0x441e9dc8d9e7b5bde9cce9d539670ea958381525fc2f98bf67e163c2b2f932c7, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 8 (partial).
+      {
+        let x := addmod(s0, 0x03a9240caa5b986b5723c2e178e9fca0747fc9b909a3b7a1f9af4ecdbdaa521d, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x4835175425f06db2ee135289ea2228b0a168951b6ac98a96550df3a61116db03, p)
+      s2 := addmod(s2, 0x17e993b6e23bdcaa9746ba6f86fccd0a813d961debe04f77aa39407eee6d681c, p)
+      s3 := addmod(s3, 0x70bcfe5488c0ea7613747dfd60901ca66231dec825e2fdac3cc56ee88146fae0, p)
+      s4 := addmod(s4, 0x3adcabe3a5b9df12ad0af220882339a2e295787bbd39c41f876abda3b44bde0f, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 9 (partial).
+      {
+        let x := addmod(s0, 0x46a27515ab5484793a817d219057f1ac0f534aae57db7dbfc16affcdff8355d9, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x4e498907151b83109410db49671c017f89133aafd0873046ac223e61480b5b5f, p)
+      s2 := addmod(s2, 0x73cc4bc15e5fb509104a040a607f0dfa7563449d13b3f43a53d66945e27fed9e, p)
+      s3 := addmod(s3, 0x1d28fe1a656bb04b76147f4a6d980ed9af4462856e6c60ce634a6c005aa70b7a, p)
+      s4 := addmod(s4, 0x605e3103ed5aa6fb80577e9fe96a42642ca52a1730fdde88845f123624eccc43, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 10 (partial).
+      {
+        let x := addmod(s0, 0x63cd3db9cb342212e9b51129221ae980d50d722a7d3c805e82047f7262452a23, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x77251eeb9891015f40d0acf7ad44618a470134843cd8f86b2f21fdcba89881e0, p)
+      s2 := addmod(s2, 0x0d3ba10f436a5a3f24622f56db754d9ebf2246b7ab2bf55d492c5359ec172ead, p)
+      s3 := addmod(s3, 0x0c3407ba5a2c45f86c2c613cd451777cfbf7ba2bbcbfb93c944e08727ad126e6, p)
+      s4 := addmod(s4, 0x3dcd1ab9ea443ef94ef9a2c5aed4c8fa7096d41c6c0aee1e4458d5924f8f66d7, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 11 (partial).
+      {
+        let x := addmod(s0, 0x29ee2c468f38ba96f2f29ba54fcaf48655e4ef74be323c089e1e9fa143fa6114, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x68fd060d65d443e98540efd28117f7f34c2e96f23b7ebe1120e64704216483d2, p)
+      s2 := addmod(s2, 0x17ee9de8649f95ba41b81337bf8af57c4d83fb65e3d749d1a6975e16d7fffeb4, p)
+      s3 := addmod(s3, 0x69a15868b6b106ea6a70777716c1a5dc0945414a6ca0bdd9954d77e5fc14115a, p)
+      s4 := addmod(s4, 0x404f037338607c0973755690b0c6880d77a513257467528d6ff85d7f8bc5c4f0, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 12 (partial).
+      {
+        let x := addmod(s0, 0x0a53011808e3ea4eb7e9770ab4560993dfd301187941e983e1358c09e6fc9e47, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x5f25f82d20726778519d64111ee31157c2c86a8ee3625d249f032fd892404e51, p)
+      s2 := addmod(s2, 0x0e686c2aef4760b8786d6e6ec71c9a29a608290f12002079a39de425bf17de9f, p)
+      s3 := addmod(s3, 0x1ae35897b0f053c8ac4d35b046bb012772538991c7afb82dc17f2324898e884a, p)
+      s4 := addmod(s4, 0x0d9436440fdd2b5240bef947b1a3180bbbd590a1d04f9dba288a643d517150f8, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 13 (partial).
+      {
+        let x := addmod(s0, 0x6ed2e8fb203d74f5e3fbd389da6f290cbd1a3b21197d9945cf2f611f73e4f621, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x2f908f67566f4abed81cab93e94ce301927d742667ac6fda435d20a439a61803, p)
+      s2 := addmod(s2, 0x26369bca049c6378ca9ce7b76000008c8dc4f00fa342da3b1b9c348a88d43609, p)
+      s3 := addmod(s3, 0x0413f5d7af16951f6160697f3875f6424907a9507e44765eebaea43e065b12ab, p)
+      s4 := addmod(s4, 0x0dba41950ac33abbf1ae4c42d6968fb507dc58bf4d78945c806b03cac7541a9a, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 14 (partial).
+      {
+        let x := addmod(s0, 0x6c39ec492fc540d1357d34cc7bf182dca87a7ed86750e48e77f7102c7cc05c7e, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x694135131f5cbadcb868aa94c2330511b1db182a97e53531139dceaba0d0cdfa, p)
+      s2 := addmod(s2, 0x64491e06c34c6cb0ea54668a85526ec8d027c01a1e7c5e756587394fc999d1bd, p)
+      s3 := addmod(s3, 0x64945facf9fd792eff603b7994002ec80bb737707a701539da8bbb097530544f, p)
+      s4 := addmod(s4, 0x66673875c4a01f75e39bbf38c6098fc4e2558fa220824793e86a390c3df0bf77, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 15 (partial).
+      {
+        let x := addmod(s0, 0x518fe97c8adf7fdbc8644cda88b3579dd937213d25e38ef227d0f57a280a5b05, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x7768dc1248397385edbc3040ea7925ea8c3db8a0d58ff23541fa3057e1f28bb1, p)
+      s2 := addmod(s2, 0x02e436c8c1fe2985e164d2f8b9179a1c49bfa15fed7e9e90bc98b07a1d9eeaf3, p)
+      s3 := addmod(s3, 0x201fe4a032c624eded8c85d7d07740a8125535260577906de96e3695640aaa76, p)
+      s4 := addmod(s4, 0x2ad57c4c24ca02a8449730fc0b46007eae9d40ada3de6d6a91af8bdf4469f1e5, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 16 (partial).
+      {
+        let x := addmod(s0, 0x1c2f5618d512488f659e122877dac1087eb5b6dc1a115bd0c16044884409c3d1, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x0613f70aec73e15c609d679eb95103a1f9d66fc75b0a1be56080e810d2d7a46a, p)
+      s2 := addmod(s2, 0x40cab767c2fd170b66f93f389d90959eec1518e2796f6038cac9ccef22749ae3, p)
+      s3 := addmod(s3, 0x3b33cc894852eb8d6177bc8a255fd1655390340f89c5035d977ccfa809ec0013, p)
+      s4 := addmod(s4, 0x591e587a40f9faa803d765a4f31bfd6166d2f40ede6c554897ea5329fd2ba7ac, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 17 (partial).
+      {
+        let x := addmod(s0, 0x370f2d84cf04a5e80f6f2009dcfb148f2f52315aa076748fd2cb435563944e57, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x774930e0f0e79d165db7f2d8cfa8625f72ab7da91296ba3884a953581fb03f21, p)
+      s2 := addmod(s2, 0x4b276f6c3fc2d1cd658dd02ae333605a6bc5f7be1268838acb46053262c7f3e5, p)
+      s3 := addmod(s3, 0x78b84cdf80a1677fe7b115eee336d258d4542cc0c890f7ba547b4420b69c593f, p)
+      s4 := addmod(s4, 0x23c671e0820c4722158f78494461717899c530cbacee2ac1e1d0c076dcc3d97c, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 18 (partial).
+      {
+        let x := addmod(s0, 0x7636a0060a6e4563a82527eb4a5fb995bf192a54d546fcd7901dd251902efe1d, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x5e3eb30d4006392041be2ccd8310a2911012ac2692137501de6b879cd8131723, p)
+      s2 := addmod(s2, 0x1b24ea6666c9069308abdf515c94de3b9202cdf3b7504ae436a90d8be6b6a652, p)
+      s3 := addmod(s3, 0x75e9c68ad819dde4f236ab05eca74aca5d710165c856a116f060755256760869, p)
+      s4 := addmod(s4, 0x1434c0d9acf6b28d564dcd7a74024fd50af7ef70919dae00318b64b4b064582e, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 19 (partial).
+      {
+        let x := addmod(s0, 0x1c607f0dc14a6065ea56907648f176817ffa9b3607bb60fcf5a4ffd1c75fc5e6, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x4f30776f024a63d32aee4541bbc3ef0666c750c2a8a6800035eb1927321e77e6, p)
+      s2 := addmod(s2, 0x6b7aba5e744adad34475cfdb2ddb3b3156839de22373c44f4a4b5e94107bd692, p)
+      s3 := addmod(s3, 0x6cbd17820dc52da1e1b76245b0f28f9b99cf9207252aeee613e028ad044a211a, p)
+      s4 := addmod(s4, 0x5f5c8e7d6757d47bca7aa5de587b41a5c71d90f53e68c80a76ee3f96f2ed9cfe, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 20 (partial).
+      {
+        let x := addmod(s0, 0x7a6d25a5dfafcfaddd7914e581c79df7850e59214d12e5b796f25894fbee507e, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x33ab01e10a972bbf55cc83e90dab3462403705f298946f9d8164597bda9b3aec, p)
+      s2 := addmod(s2, 0x0821e13dc72e42d5a21c9e2a9609e0d9567dc78037a6a2b7b7509ed0381376ee, p)
+      s3 := addmod(s3, 0x592db91094e7505988aac609af613e2b4f512ea3783a556298e9310e5b15fb0d, p)
+      s4 := addmod(s4, 0x33a25fa4939d096d4521a90dc9907f22331f113db9d7f89492d7a45eef064e2f, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 21 (partial).
+      {
+        let x := addmod(s0, 0x77109906bb232852d8b8c346e83be37fdf629c7b170916b2403dde5b09671ad8, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x5045c96db0d3451ef4bcddb81d97d15bd452cd93780d3aa1552f103090c3f283, p)
+      s2 := addmod(s2, 0x6bad7de355fee25ea81ccb7853c1b55e3ec99b81097187247cb9a349dc878645, p)
+      s3 := addmod(s3, 0x63061a43ae0cdea802a0a901d43b4486cf896d54112bbd378e53f7c7e0f8bfd3, p)
+      s4 := addmod(s4, 0x0de69e5cdf8f84417bf3a5f98ee6b9717e8d3d58f46284451d36444a4d3b676f, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 22 (partial).
+      {
+        let x := addmod(s0, 0x40aedabb5b05d4b65eb520c372c099a31166c53c8b51d71c7150d15acb70ecdc, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x0fe49aefb7f77f49d91a8733259c34a8671a3ce05bf2352f2c6f233226676db9, p)
+      s2 := addmod(s2, 0x3ce58d5d66ed2b8b2460ca810e774a8f2f45d6566153ee92a70005f88268a2c7, p)
+      s3 := addmod(s3, 0x55f2a6b9cd31e6e780669c480fac3e8a26b630e9cf9af31385d7586fafae02d1, p)
+      s4 := addmod(s4, 0x467080c0420876b6163e86bc3c59804642906129ef1fc6a3d17dc614deae948c, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 23 (partial).
+      {
+        let x := addmod(s0, 0x4b0a0647ff17332cbd962ed109eab72401bc4fcfa00b0d3743c941b9abe8da35, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x7ce530f30a77395f2ceae319046477c0e10bdea1c8c6fb6fe33a01b6e793300d, p)
+      s2 := addmod(s2, 0x29059db97b1128d3a32c93aa9dab27b0327f30b97009e7e2a1ade57a5e11af99, p)
+      s3 := addmod(s3, 0x476d3e5875d71029c25bf3580e437d2adf88a6d19f22cd7fee8df7399c169013, p)
+      s4 := addmod(s4, 0x267950d80c992bc4afd5d59e1430cf44f173f90b9dd2fdd8af1ba0d4b33f4134, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 24 (partial).
+      {
+        let x := addmod(s0, 0x5199f5bb14fec8290ac3478fe7ca4769b6c1436932471c49dc1b4bc2fb2c60fc, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x7ca7ae88c68a6f28263ff867cc374da2736a22984e6c863435f761b4f8cade41, p)
+      s2 := addmod(s2, 0x3431a37a894ef81fd6cc2dbf35a71f3579e1b23812820378a0e137e438449ae8, p)
+      s3 := addmod(s3, 0x35edb32486830cf335b981aed5d6c3cd86ca2afd895a37fb746f0c8f31169b19, p)
+      s4 := addmod(s4, 0x3a7797525591a4388b332e1928cca769be0957b0b51a3f8bc2cebc8f24a3e5dc, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 25 (partial).
+      {
+        let x := addmod(s0, 0x485fb2779f101eeb8dcce885d6fecc44eb8440f2cd7e57472ef26c8792607782, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x073d62bdd904cd08059370568fb373f89ae00649f6f263bb5b9d2407f812d7b6, p)
+      s2 := addmod(s2, 0x158b7fcaf0474a86dc1d43f520b8e307692e284894db0e367e9bd2bee990d31e, p)
+      s3 := addmod(s3, 0x28295d7013b6ebc59dc037acd2b0fd515a816b4dfe144264385f35c6d50b8c06, p)
+      s4 := addmod(s4, 0x1dc86e6db6c88148f7f12b22c397d9fed64a9f9c0b6bcbc2a6baaaa44bb3b916, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 26 (partial).
+      {
+        let x := addmod(s0, 0x7d2bc7194a2573931aae3463bbf7e213a2a90321c58b100c3945222eda2545ae, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x7e36b9e99d051c4a0120ef936b2ab7e866f0dcadb3d5b26d9087e28c3439e19d, p)
+      s2 := addmod(s2, 0x2ac3a822bdbcc4932a6ae9e18b1125cb0968ade1bbe8a8ae38c04240b601a241, p)
+      s3 := addmod(s3, 0x63bdff934ef8ce88d60bfc3e2770a744045398803313c4821ba254a488012ee6, p)
+      s4 := addmod(s4, 0x0a3027d1499ae84f190c545b9648ec0491d459713fd6401d9e2af322fc18223a, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 27 (partial).
+      {
+        let x := addmod(s0, 0x478d416283b11046a0616420e373544192d854588d7cbcf6606acf2496e7fbde, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x712cd3b891b88bb6e531fb4bc178f027de9e263cb91979fdf55bc1c8a237b510, p)
+      s2 := addmod(s2, 0x3b5c43a1343cfc4e00c0277db6d8bef325602e3a51b98fc634112b7bdd1fedc1, p)
+      s3 := addmod(s3, 0x1076283d29b946f22fe01ca35a96e44b69238ed8294c90b51f50976b170b4003, p)
+      s4 := addmod(s4, 0x2b0ce0ea04c1e136aabe4e02f4700c653d52fd798f0d8b16255cca455c22c747, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 28 (partial).
+      {
+        let x := addmod(s0, 0x79d2afb5aca2a795d20839f05243ee9dd7f65817136a51afc6e5cf3d54ceb31b, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x32562a1d8d68ebcabb884333b7580c4b23ad42bbe1f93d03c1b17f073ad66d77, p)
+      s2 := addmod(s2, 0x09b922722f9f68b2f5ad873c85db3f34b31b3d62cfc17f9819164868c9309a2a, p)
+      s3 := addmod(s3, 0x460cd0930f94c61e91da8fedd777b29ac6c6545e9311d99d04e841ba4b917fa9, p)
+      s4 := addmod(s4, 0x357baedb74bf338da4e784bb2c23fda9ede1902e32d92ccb27f8da65e6fe75a5, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 29 (partial).
+      {
+        let x := addmod(s0, 0x1f341ef6e02c45a1929351be2393795aeac330df011f80be081bcbe455efd79e, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x3b3e32f3feaf24a85d7c499a743aa9bf9e9f2d8699e2da044329928752cb80d1, p)
+      s2 := addmod(s2, 0x6f39514b2770215f3f890a311b336610763025fdae8ad0a21979b5277d1618fa, p)
+      s3 := addmod(s3, 0x3c2e35fdd59bdce46696e19a8a04f85a39e57ebb3eafb27c9cc2ae2adaaf2480, p)
+      s4 := addmod(s4, 0x37c3cc51f42913b9fb515c960cd7ebb44858b50a92ab3de3ed1283d280358b44, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 30 (partial).
+      {
+        let x := addmod(s0, 0x727f9e5058e64f3d3a9860fa79fc09d574844bd8210c98d25f62a3b3542e9f91, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x5a8e047a207507f9968eb59b3d3fd75ecb0677a6114f9ea0272026e660dcf9c9, p)
+      s2 := addmod(s2, 0x0429ae5f5f75b63c43e68e53bf2873343eca87221c7812e741623c36c756f42d, p)
+      s3 := addmod(s3, 0x427b89eba85155479210184cd57cc9fee403d523c27bfec89a89bcdb6dc1e776, p)
+      s4 := addmod(s4, 0x208cb01c007a863393ebeea77eb646a167e2ca0cd8c17a191755f1e746720c9e, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 31 (partial).
+      {
+        let x := addmod(s0, 0x497667b8fc81fd3063d56f47277ac7b23706a97f1104e70bdeee320b7c5c7a8d, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x7bb4e82278d013fec71a60e2a69978a64875197fd0275aac4f7f89c94f31ec5b, p)
+      s2 := addmod(s2, 0x112517f2c68a944bba9b8c476a493a7917d92749ec39679365ed6de780ef5fd0, p)
+      s3 := addmod(s3, 0x3ae81689d405e950d013c94a2d9c3500471009fe00ab5dc53c1168cac04c2864, p)
+      s4 := addmod(s4, 0x3698f0f409f35c6a36165ff6b8b6a2745729ed1e56b849447c7da8cfb558aa41, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 32 (partial).
+      {
+        let x := addmod(s0, 0x530374bdc71a9c600224461039d390c92f3075b791190296b674fb991de09b0a, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x13e5a1a95944ea337bb452b06d31ec5d598cef35aa39641ccc07c064fecae55b, p)
+      s2 := addmod(s2, 0x3c38a065b4c92f5d22f462eef877b57698c6a0740696a488f3c2fecb7556bbd4, p)
+      s3 := addmod(s3, 0x1ad1f91f11d428ce4dcf54e0648881d72686fdbb2f435e1039d6aa16bdcb458e, p)
+      s4 := addmod(s4, 0x7b251482a7152c70e6b04bfd08a51ef8e6002ff124fd718b2b37719cdd4baf52, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 33 (partial).
+      {
+        let x := addmod(s0, 0x469f5c3071dbf95a32238fd1b28372a76a232f36d5e76da62f05d34dcaef5170, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x14ddeb10235f8d299f332b9341750417a099f0dcb3226cbca55addb0b20a8ae8, p)
+      s2 := addmod(s2, 0x7046540b44efe97eb3aaab9e75117bd65ebb2853f65e61b11292f52fef958251, p)
+      s3 := addmod(s3, 0x127a4db1c41c8afce3f455670ae1fa3240d73fa8cc2f0aa110b7b33e7c1bcd5f, p)
+      s4 := addmod(s4, 0x329c11752ae1246c9348e685822cded520bd5c92c545b980677f5de58bf07c86, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 34 (partial).
+      {
+        let x := addmod(s0, 0x4b07208ddfcdf9584e4a19d9df787520b29ccc1d237989e6ce60158e40249ef7, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x6e882cf97b6824c456750ccaefd8e2cbdb7e138fd5bb60a7759ed68d73853343, p)
+      s2 := addmod(s2, 0x0378fc9dbdf53c26b9f9701e778fe356cf6915ca88456cb26f24c257fc8b68b9, p)
+      s3 := addmod(s3, 0x74fad83429c327f48ed145b68da54bc43b303f09abe3f1930258494aad6fdeba, p)
+      s4 := addmod(s4, 0x42d6829235a37ecda979a5a94063e46a791c0a8527f787e4c9947329c6eba6c6, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 35 (partial).
+      {
+        let x := addmod(s0, 0x45cb88449ba86d774d729c48a41e7415bd596875f072449eec2d95db47e6b772, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x518e2aed68fcd20d44217cf768afac4dcc420c8bba6fc783b41c41ec4809a305, p)
+      s2 := addmod(s2, 0x30db76c4bf2662c31817dca7346d36630923600adfec17961e7ca944e76dccdd, p)
+      s3 := addmod(s3, 0x3d116762d82eb27273986fa99bb8a8ac3e8c6cc5dc2754bcf29f0f591b67b969, p)
+      s4 := addmod(s4, 0x6b59c1caf23f17cc195fccd3bca7191c2719061a6ae76d7411ed58a6b6f81c4b, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 36 (partial).
+      {
+        let x := addmod(s0, 0x2c1b8ec3d1907c9c696ec48ab3a01cd9b9e0f19eb08eb968bbc27ca533e1c8fc, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x4de150c49082d43edcf1a96dd5cedbefbe96fe418da3897f1ceab5cdec7f0645, p)
+      s2 := addmod(s2, 0x29de158f1bd43f746603d1287a659ea74b1cba4119211f7ae4c72c37184310d5, p)
+      s3 := addmod(s3, 0x52ebe606cbee0b420e937409db3458cf8898ac1d3e04ea0c9e54afee279162ec, p)
+      s4 := addmod(s4, 0x23febf49f46f9d655451da0e9ac17382580b19568429524061655b49cc4272b1, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 37 (partial).
+      {
+        let x := addmod(s0, 0x12957b261336dce0fcb6dc34c6cf2e4c671d2f3584e0bc14b18de457e7582162, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x699ce2be6ea758270e7ffd2b6981a03c655069d8c26a0331df921e56a57171c3, p)
+      s2 := addmod(s2, 0x45b07830e26bd51fffc403aa0ef3c944ed6a4170c4074e8fbc065c3b39a383a9, p)
+      s3 := addmod(s3, 0x2af01158d247a3ce7825145e381c4dba73a20e4b8183c8f012a6ca7126c11b83, p)
+      s4 := addmod(s4, 0x0636be45e065314b84bd171aac2de65eafb3afaa00211950677318113db8a0f6, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 38 (partial).
+      {
+        let x := addmod(s0, 0x422bc924a2051d6c3ba9cac824d4d7bf433fdc59f22e46f9fb076d9c1a846b69, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x3fa587dab913e48fd71b57b24145a888092a193cb120569219a744233080b6fa, p)
+      s2 := addmod(s2, 0x2a9fcf3ee11f1ba44699a92c25eadaee8ab3b63146ecc3744bdfffaacde63a50, p)
+      s3 := addmod(s3, 0x22cdbca98d5d04779e250272b9037e6288edab9e7540238288494cb98e6b2c3e, p)
+      s4 := addmod(s4, 0x34c549d685fc1dfa45b974302d964b18a9943844f180acc864bda11a22034cb1, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 39 (partial).
+      {
+        let x := addmod(s0, 0x7d5326149bf97b73a8334bef035f11ec3843f57d6e7323145239d143baf1a8f0, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x6037bc9ddcdf3f1d404cd2dcf4678528da436d11e40a49f0567dd6b33486af30, p)
+      s2 := addmod(s2, 0x7efe1d7e647f050dc6390deda01c45ba7abf587eb466696c84be2ffc23da9428, p)
+      s3 := addmod(s3, 0x58fd79e9f85fe7f2ed47defb06415ec96e4b60705dfa8d3348e5282d4863c8cb, p)
+      s4 := addmod(s4, 0x0b76828820d6b4011d1cdb97196545dc6c29826a875a8c3d11d88938794ba8c3, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 40 (partial).
+      {
+        let x := addmod(s0, 0x4440562277a22f6f29d92a271743b5818fa3d088db7a0f4799935153d5b0cce2, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x510f6f15dfa0562f2278bb71aee401ec871d976ba67f958a525b83708a60dfca, p)
+      s2 := addmod(s2, 0x0ff09097901fab09b86fb6c7bd1d48c5e59e39bd1aa5eccea004c8d6d5388399, p)
+      s3 := addmod(s3, 0x1500c91a4abd5b3cd1e852a41ee3e2b7af94efeceadc780cce12475ae76f8084, p)
+      s4 := addmod(s4, 0x2c0be3cd93579b50cd7a6397ffed8602d882e31a7b501d2321aa96df9f18bc71, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 41 (partial).
+      {
+        let x := addmod(s0, 0x2feb36eda8df059a11f53fd190a097cbdb6c3f764dca8f95a474a8133b45d4cd, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x5a0f4998c88fbd6fe8119be6d785cb6f4862cc7c027c5d7cd4e8ec0d1ed561de, p)
+      s2 := addmod(s2, 0x19d8840ca10b393c2a3626c4e00c8accb64b532d5a4c04809f59000b1f157ba4, p)
+      s3 := addmod(s3, 0x065ad7f5c16d4ee3268a4bd22dfaf8ad3cdcefe6b4f051b5d79534805f904f13, p)
+      s4 := addmod(s4, 0x2fcc0e76b07bce21982346693570dd32e194727b9ce820e1d9747e90c3ec913a, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 42 (partial).
+      {
+        let x := addmod(s0, 0x1c2e7b72d731135def85cca43c16d27994d243908241be62e733850d49ae6906, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x078e6e793e3dc140d4be4303d9cb6c9a49908379d653c83cfd65daf725d6f2b4, p)
+      s2 := addmod(s2, 0x2262e8d99619761a7daf3fe65ef8e3b3f9bdc7dfb917280f90e311a846360eef, p)
+      s3 := addmod(s3, 0x3c459f465631c005895592970589171f441243fbd456a2d4dc05309a7d1421dd, p)
+      s4 := addmod(s4, 0x6f0123a702ce0784afe9db4912d69ddab24d3b39e6dc4a954c9b5a05f1f73848, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 43 (partial).
+      {
+        let x := addmod(s0, 0x45d4ccd10f584e608923c1368d2b87afa4cbcbfdb8082d764be78c7d75010951, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x2ca3f987c303444cef0bb93f91a2c4d1a4b276a8dde9b45c0e258c2a1a05391a, p)
+      s2 := addmod(s2, 0x59c41f4d0a3baeac71689cce1fdb10151eaff12f0499f3b62841749b57bf368a, p)
+      s3 := addmod(s3, 0x2167d3bc407bfacae586ce5cbe37749c345647a3446b0666d6e9165b95366961, p)
+      s4 := addmod(s4, 0x25bfb81649a4bf72336481c6865d39fa1f7fb65494bdc141b2e8cc740930b25d, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 44 (partial).
+      {
+        let x := addmod(s0, 0x3cb76eb09aafedf62a11cc5739835c273448dc9397b47def30a3304c5d547930, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x7de05521a8c8408a3bd72e6ed0d1a2bff0db4722d41552d19188d2434be7c91d, p)
+      s2 := addmod(s2, 0x6cddc7b2722e2664572d5cfa77903809d39a915acdce60c439ca3f33a0eb0390, p)
+      s3 := addmod(s3, 0x49a9d8cd973679d30ed3ea1880f2218e3c1dec6cbdcd31ea23f1a0c4fa90f118, p)
+      s4 := addmod(s4, 0x0110602c67c362d0796d590c229a8ba07652188a257fa7f5d865f7ebb46ccac9, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 45 (partial).
+      {
+        let x := addmod(s0, 0x3936096bf341d8fce541213c2d9966ee886ca03cc10b5ed84f97b9954c3ae54d, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x7d783bf9c1d188e5fb6b22c3885d8176e70f99433dbf136b14ddf86b3db9be64, p)
+      s2 := addmod(s2, 0x002b5b81006e2909ba680e7f2c1a3850e5bab02d1ad03a97354a8e1c578217dd, p)
+      s3 := addmod(s3, 0x42a722c25d37975e0356a29bfe777250a7536d2985f42bb74c60ccd2b12f59a7, p)
+      s4 := addmod(s4, 0x2e1ce9f66fffbbd3e9fec616abd017e4fce8857333816d6f6ea79135d4422f39, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 46 (partial).
+      {
+        let x := addmod(s0, 0x37074def218fdbf542cc5d288ca3e99e0e1af41782bb92e71f24fe64e3cc2f93, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x34fbdf149425fc5fb1392068ab2be6585ffb0d4fe7bc36120389235d86060d8a, p)
+      s2 := addmod(s2, 0x4c9021337f7571e2f6d79db9010a9f2ec10d8fbaa0d69b3ee14af3e344037ede, p)
+      s3 := addmod(s3, 0x0827b6bdeb6bd85430bf1bae9aac432e2550080dfcec7c22cbe67d447bedf900, p)
+      s4 := addmod(s4, 0x7bd045b8059606ff44c84ec0b68b58f45bf7fa13ac7a9fadca6a191b365b83bc, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 47 (partial).
+      {
+        let x := addmod(s0, 0x4c3c0a20c648f933fd92500970c7d00b06f9ed9f4604cd343d36f2d0dc20204c, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x05dd114c5a8f67ac200b6aeb54084c86ff1f91be4129aba3384dd3da847ee619, p)
+      s2 := addmod(s2, 0x4e7fb35f4c3e4f0e7706aaf15f45a226ce295cd439ff055574588df8ec6ca3af, p)
+      s3 := addmod(s3, 0x12929876c5c1c218ae2cde378c28aad0d8adc53af2c392652f1fa899740a454e, p)
+      s4 := addmod(s4, 0x116cd86f1c1eb4f72554d0ed3872d3c854a86176154e515bfdc0be22dd827539, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 48 (partial).
+      {
+        let x := addmod(s0, 0x0ff8017ced1e13d723bedefefada9d23e4bf9dc7a60ef1069d608aac5fdb3df6, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x678299c679efe331ac5907b64ad296c8bc28d46cbe5f42237146fdc25a291aea, p)
+      s2 := addmod(s2, 0x251d69c0f32d22a1c92ac1e8ddea3a8880b956edce8e66e12014716a21549711, p)
+      s3 := addmod(s3, 0x35bcbd7136f4ee885ab3e913144ca6d61ebbed7cf637474d04f91bb64b73af3c, p)
+      s4 := addmod(s4, 0x404e8e7b14c04a18e6b4feb7f4536ba6f38d2a62269ed55a676bc1404c37052b, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 49 (partial).
+      {
+        let x := addmod(s0, 0x0bb39153e10c018ea34384e58744ad1f3e2f4da8c93f495f3ac07f8363de331e, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      s1 := addmod(s1, 0x67ba83a45ee7d891683df162ccbd461d759ec045a971c8fddd90da4f941a27e2, p)
+      s2 := addmod(s2, 0x670b6b3964a1e8b619b40f46f6b66562d85f9a9328aaf8efe7edec66bb0a67e2, p)
+      s3 := addmod(s3, 0x4311adf84e3ef7721d2b4e17928353f51c3b258f4a6e2b86f2108b8bc4f04b5c, p)
+      s4 := addmod(s4, 0x7966dae5e8e60ec31051a966e662ec159918900f44fd956eb7ffffcd48363961, p)
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 50 (full).
+      {
+        let x := addmod(s0, 0x73f8529c8e692264e036274854ccf44587a0f216963285f6ba518c9721ebbffc, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      {
+        let x := addmod(s1, 0x4d2cb64ab1f02ac8eff234bc993821ee8dcdef93f0ecba62cff2f1bb4603632d, p)
+        s1 := mulmod(x, x, p)
+        s1 := mulmod(s1, x, p)
+        s1 := mulmod(s1, s1, p)
+        s1 := mulmod(s1, x, p)
+      }
+      {
+        let x := addmod(s2, 0x4c60666810e4db20de5501252cc755288c8742a06199f5ecf4862571a9ea2d5f, p)
+        s2 := mulmod(x, x, p)
+        s2 := mulmod(s2, x, p)
+        s2 := mulmod(s2, s2, p)
+        s2 := mulmod(s2, x, p)
+      }
+      {
+        let x := addmod(s3, 0x4d248c581ca9452b930121b720ebc2a38c9f8e08236e3c8f5357c2fb7592f45e, p)
+        s3 := mulmod(x, x, p)
+        s3 := mulmod(s3, x, p)
+        s3 := mulmod(s3, s3, p)
+        s3 := mulmod(s3, x, p)
+      }
+      {
+        let x := addmod(s4, 0x7ef206e1852db368ecdd4468937de4389e4c27fffd7d1ee774de6881f3586ce1, p)
+        s4 := mulmod(x, x, p)
+        s4 := mulmod(s4, x, p)
+        s4 := mulmod(s4, s4, p)
+        s4 := mulmod(s4, x, p)
+      }
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 51 (full).
+      {
+        let x := addmod(s0, 0x13b593d31aec49788e0b23a8f95488d7d424fad2cc8d7444e3df3a7146e033fc, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      {
+        let x := addmod(s1, 0x4adafdaf814ebf3221a34cbd661423c6bcd37267984eb71ce2cf8c75aa1729cc, p)
+        s1 := mulmod(x, x, p)
+        s1 := mulmod(s1, x, p)
+        s1 := mulmod(s1, s1, p)
+        s1 := mulmod(s1, x, p)
+      }
+      {
+        let x := addmod(s2, 0x3cad810879a2ce0b4e0b24106c2d1ed29fbf2178da2dc5ddbf1ce4d159ed306f, p)
+        s2 := mulmod(x, x, p)
+        s2 := mulmod(s2, x, p)
+        s2 := mulmod(s2, s2, p)
+        s2 := mulmod(s2, x, p)
+      }
+      {
+        let x := addmod(s3, 0x7d7fffcd0e7a8a8079a88b9d4462c2e99ec6c8fc7de968c3b4217d950100f3e4, p)
+        s3 := mulmod(x, x, p)
+        s3 := mulmod(s3, x, p)
+        s3 := mulmod(s3, s3, p)
+        s3 := mulmod(s3, x, p)
+      }
+      {
+        let x := addmod(s4, 0x26c4f6780936bed531b44873d9c18684aeb6e5f7eeb5b4f47c970bb29afea1e5, p)
+        s4 := mulmod(x, x, p)
+        s4 := mulmod(s4, x, p)
+        s4 := mulmod(s4, s4, p)
+        s4 := mulmod(s4, x, p)
+      }
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 52 (full).
+      {
+        let x := addmod(s0, 0x74916dcf1701ce584352228a873a96fe1d531bf50cbfce778100cdbb84568679, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      {
+        let x := addmod(s1, 0x7c7c88a3ad730f91855d229b5abc31bb7f2d05ab3a6654f797ec496a8f4c2581, p)
+        s1 := mulmod(x, x, p)
+        s1 := mulmod(s1, x, p)
+        s1 := mulmod(s1, s1, p)
+        s1 := mulmod(s1, x, p)
+      }
+      {
+        let x := addmod(s2, 0x62af662f0cf482f2411d5c10f668fc0711507b0ed7dc7c915dae03646d4675d0, p)
+        s2 := mulmod(x, x, p)
+        s2 := mulmod(s2, x, p)
+        s2 := mulmod(s2, s2, p)
+        s2 := mulmod(s2, x, p)
+      }
+      {
+        let x := addmod(s3, 0x044b1bf9297768fd17cad63fdcbacc216cb1d4446d0ce867cd61ae8bdf7f7161, p)
+        s3 := mulmod(x, x, p)
+        s3 := mulmod(s3, x, p)
+        s3 := mulmod(s3, s3, p)
+        s3 := mulmod(s3, x, p)
+      }
+      {
+        let x := addmod(s4, 0x54ba804a9348a16368cd860eb383bda566c2280da6fe45c4cfc6b338b1519a56, p)
+        s4 := mulmod(x, x, p)
+        s4 := mulmod(s4, x, p)
+        s4 := mulmod(s4, s4, p)
+        s4 := mulmod(s4, x, p)
+      }
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      // Round 53 (full).
+      {
+        let x := addmod(s0, 0x34700699b521b24d83b93b8ad3bfcf0b7845abaafb7d4c51b20c4fd87936ea6d, p)
+        s0 := mulmod(x, x, p)
+        s0 := mulmod(s0, x, p)
+        s0 := mulmod(s0, s0, p)
+        s0 := mulmod(s0, x, p)
+      }
+      {
+        let x := addmod(s1, 0x5eb418e5008066afbb6a7ed532c795c0b6ba4f890456f4ec00133e79275e38fb, p)
+        s1 := mulmod(x, x, p)
+        s1 := mulmod(s1, x, p)
+        s1 := mulmod(s1, s1, p)
+        s1 := mulmod(s1, x, p)
+      }
+      {
+        let x := addmod(s2, 0x2fe3e00a67806dd2b95d8aabf12ae12a93f7e5cc14430861e50cb222a05cd549, p)
+        s2 := mulmod(x, x, p)
+        s2 := mulmod(s2, x, p)
+        s2 := mulmod(s2, s2, p)
+        s2 := mulmod(s2, x, p)
+      }
+      {
+        let x := addmod(s3, 0x210b940c0b52dfd93f54bf61e2a2fcdc1407d952ef201d74c16ebf3d6ad0abb3, p)
+        s3 := mulmod(x, x, p)
+        s3 := mulmod(s3, x, p)
+        s3 := mulmod(s3, s3, p)
+        s3 := mulmod(s3, x, p)
+      }
+      {
+        let x := addmod(s4, 0x1576d540f1bff3d1f9ff63da4fd6da13f1b572de823f91c481118677447f04c6, p)
+        s4 := mulmod(x, x, p)
+        s4 := mulmod(s4, x, p)
+        s4 := mulmod(s4, s4, p)
+        s4 := mulmod(s4, x, p)
+      }
+      s0, s1, s2, s3, s4 := mds(s0, s1, s2, s3, s4)
+      mstore(add(state, 0x0), s0)
+      mstore(add(state, 0x20), s1)
+      mstore(add(state, 0x40), s2)
+      mstore(add(state, 0x60), s3)
+      mstore(add(state, 0x80), s4)
+    }
+    return state;
+  }
+}
+
 /// @title Poseidon1Sponge
 /// @notice The Poseidon1 sponge over BlueSky, built on the permutation libraries in this file.
 /// @dev Matches `hash` and `hash0` of the `starkom-poseidon` crate. The domain separator tags
@@ -2917,6 +5597,117 @@ library Poseidon1Sponge {
     uint256[] memory inputs
   ) internal pure returns (uint256) {
     return hashT5X5(dst, inputs)[0];
+  }
+
+  /// @notice Hashes `inputs` with the `Poseidon1T3X7` permutation, returning the whole rate.
+  /// @dev Matches `hash::<BlueSkyConfigT3X7, Scalar, 3, R, C>`.
+  /// @param dst The domain separator tags, which initialize the capacity elements. Their number
+  ///   is the capacity C, which must be less than 3. Every tag must be in [0, p).
+  /// @param inputs The inputs, every one in [0, p). There must be at least one.
+  /// @return output The R = 3 - C elements of the rate after the last permutation.
+  function hashT3X7(
+    uint256[] memory dst,
+    uint256[] memory inputs
+  ) internal pure returns (uint256[] memory output) {
+    uint256 rate = _rate(dst, inputs, 3);
+    uint256[3] memory state;
+    for (uint256 i = 0; i < dst.length; i++) {
+      state[rate + i] = dst[i];
+    }
+    for (uint256 offset = 0; offset < inputs.length; offset += rate) {
+      for (uint256 i = 0; i < rate && offset + i < inputs.length; i++) {
+        state[i] = addmod(state[i], inputs[offset + i], P);
+      }
+      state = Poseidon1T3X7.permute(state);
+    }
+    output = new uint256[](rate);
+    for (uint256 i = 0; i < rate; i++) {
+      output[i] = state[i];
+    }
+  }
+
+  /// @notice Hashes `inputs` with the `Poseidon1T3X7` permutation, returning the first element of
+  ///   the rate (see `hashT3X7`).
+  /// @dev Matches `hash0::<BlueSkyConfigT3X7, Scalar, 3, R, C>`.
+  function hash0T3X7(
+    uint256[] memory dst,
+    uint256[] memory inputs
+  ) internal pure returns (uint256) {
+    return hashT3X7(dst, inputs)[0];
+  }
+
+  /// @notice Hashes `inputs` with the `Poseidon1T4X7` permutation, returning the whole rate.
+  /// @dev Matches `hash::<BlueSkyConfigT4X7, Scalar, 4, R, C>`.
+  /// @param dst The domain separator tags, which initialize the capacity elements. Their number
+  ///   is the capacity C, which must be less than 4. Every tag must be in [0, p).
+  /// @param inputs The inputs, every one in [0, p). There must be at least one.
+  /// @return output The R = 4 - C elements of the rate after the last permutation.
+  function hashT4X7(
+    uint256[] memory dst,
+    uint256[] memory inputs
+  ) internal pure returns (uint256[] memory output) {
+    uint256 rate = _rate(dst, inputs, 4);
+    uint256[4] memory state;
+    for (uint256 i = 0; i < dst.length; i++) {
+      state[rate + i] = dst[i];
+    }
+    for (uint256 offset = 0; offset < inputs.length; offset += rate) {
+      for (uint256 i = 0; i < rate && offset + i < inputs.length; i++) {
+        state[i] = addmod(state[i], inputs[offset + i], P);
+      }
+      state = Poseidon1T4X7.permute(state);
+    }
+    output = new uint256[](rate);
+    for (uint256 i = 0; i < rate; i++) {
+      output[i] = state[i];
+    }
+  }
+
+  /// @notice Hashes `inputs` with the `Poseidon1T4X7` permutation, returning the first element of
+  ///   the rate (see `hashT4X7`).
+  /// @dev Matches `hash0::<BlueSkyConfigT4X7, Scalar, 4, R, C>`.
+  function hash0T4X7(
+    uint256[] memory dst,
+    uint256[] memory inputs
+  ) internal pure returns (uint256) {
+    return hashT4X7(dst, inputs)[0];
+  }
+
+  /// @notice Hashes `inputs` with the `Poseidon1T5X7` permutation, returning the whole rate.
+  /// @dev Matches `hash::<BlueSkyConfigT5X7, Scalar, 5, R, C>`.
+  /// @param dst The domain separator tags, which initialize the capacity elements. Their number
+  ///   is the capacity C, which must be less than 5. Every tag must be in [0, p).
+  /// @param inputs The inputs, every one in [0, p). There must be at least one.
+  /// @return output The R = 5 - C elements of the rate after the last permutation.
+  function hashT5X7(
+    uint256[] memory dst,
+    uint256[] memory inputs
+  ) internal pure returns (uint256[] memory output) {
+    uint256 rate = _rate(dst, inputs, 5);
+    uint256[5] memory state;
+    for (uint256 i = 0; i < dst.length; i++) {
+      state[rate + i] = dst[i];
+    }
+    for (uint256 offset = 0; offset < inputs.length; offset += rate) {
+      for (uint256 i = 0; i < rate && offset + i < inputs.length; i++) {
+        state[i] = addmod(state[i], inputs[offset + i], P);
+      }
+      state = Poseidon1T5X7.permute(state);
+    }
+    output = new uint256[](rate);
+    for (uint256 i = 0; i < rate; i++) {
+      output[i] = state[i];
+    }
+  }
+
+  /// @notice Hashes `inputs` with the `Poseidon1T5X7` permutation, returning the first element of
+  ///   the rate (see `hashT5X7`).
+  /// @dev Matches `hash0::<BlueSkyConfigT5X7, Scalar, 5, R, C>`.
+  function hash0T5X7(
+    uint256[] memory dst,
+    uint256[] memory inputs
+  ) internal pure returns (uint256) {
+    return hashT5X7(dst, inputs)[0];
   }
 
   /// @dev Checks the arguments of a hash with state width `width`, reverting if they're invalid,

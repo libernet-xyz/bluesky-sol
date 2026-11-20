@@ -11,7 +11,10 @@
 //! it to `contracts/Poseidon1.sol` and formats it with prettier.
 
 use starkom_bluesky::Scalar;
-use starkom_poseidon::{BlueSkyConfigT3X5, BlueSkyConfigT4X5, BlueSkyConfigT5X5, Config};
+use starkom_poseidon::{
+    BlueSkyConfigT3X5, BlueSkyConfigT3X7, BlueSkyConfigT4X5, BlueSkyConfigT4X7, BlueSkyConfigT5X5,
+    BlueSkyConfigT5X7, Config,
+};
 
 /// The BlueSky prime p.
 const MODULUS: &str = "0x7ffffffffffffffffffffffffffffffe0673ddf29e9b5547c000000000000001";
@@ -302,6 +305,9 @@ fn main() {
         Parameters::of::<BlueSkyConfigT3X5, 3>("BlueSkyConfigT3X5"),
         Parameters::of::<BlueSkyConfigT4X5, 4>("BlueSkyConfigT4X5"),
         Parameters::of::<BlueSkyConfigT5X5, 5>("BlueSkyConfigT5X5"),
+        Parameters::of::<BlueSkyConfigT3X7, 3>("BlueSkyConfigT3X7"),
+        Parameters::of::<BlueSkyConfigT4X7, 4>("BlueSkyConfigT4X7"),
+        Parameters::of::<BlueSkyConfigT5X7, 5>("BlueSkyConfigT5X7"),
     ];
     print!(
         r#"// SPDX-License-Identifier: Apache-2.0

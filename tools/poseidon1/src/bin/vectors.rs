@@ -12,12 +12,16 @@
 use serde::Serialize;
 use starkom_bluesky::{Scalar, from_const};
 use starkom_ff::Field;
-use starkom_poseidon::{BlueSkyConfigT3X5, BlueSkyConfigT4X5, BlueSkyConfigT5X5, Config};
+use starkom_poseidon::{
+    BlueSkyConfigT3X5, BlueSkyConfigT3X7, BlueSkyConfigT4X5, BlueSkyConfigT4X7, BlueSkyConfigT5X5,
+    BlueSkyConfigT5X7, Config,
+};
 
 /// A permutation test case.
 #[derive(Serialize)]
 struct PermutationCase {
     width: usize,
+    alpha: usize,
     input: Vec<String>,
     output: Vec<String>,
 }
@@ -26,6 +30,7 @@ struct PermutationCase {
 #[derive(Serialize)]
 struct HashCase {
     width: usize,
+    alpha: usize,
     dst: Vec<String>,
     inputs: Vec<String>,
     output: Vec<String>,
@@ -58,6 +63,7 @@ fn permutation_cases<Cfg: Config<Scalar, T>, const T: usize>(cases: &mut Vec<Per
         let output = starkom_poseidon::permutation::<Cfg, Scalar, T>(input);
         cases.push(PermutationCase {
             width: T,
+            alpha: Cfg::alpha(),
             input: hex(&input),
             output: hex(&output),
         });
@@ -75,6 +81,7 @@ fn hash_cases<Cfg: Config<Scalar, T>, const T: usize, const R: usize, const C: u
         let output = starkom_poseidon::hash::<Cfg, Scalar, T, R, C>(dst, inputs.iter().copied());
         cases.push(HashCase {
             width: T,
+            alpha: Cfg::alpha(),
             dst: hex(&dst),
             inputs: hex(&inputs),
             output: hex(&output),
@@ -97,6 +104,9 @@ fn main() {
     permutation_cases::<BlueSkyConfigT3X5, 3>(&mut permutations);
     permutation_cases::<BlueSkyConfigT4X5, 4>(&mut permutations);
     permutation_cases::<BlueSkyConfigT5X5, 5>(&mut permutations);
+    permutation_cases::<BlueSkyConfigT3X7, 3>(&mut permutations);
+    permutation_cases::<BlueSkyConfigT4X7, 4>(&mut permutations);
+    permutation_cases::<BlueSkyConfigT5X7, 5>(&mut permutations);
 
     let mut hashes = vec![];
     hash_cases::<BlueSkyConfigT3X5, 3, 3, 0>(&mut hashes);
@@ -111,6 +121,18 @@ fn main() {
     hash_cases::<BlueSkyConfigT5X5, 5, 3, 2>(&mut hashes);
     hash_cases::<BlueSkyConfigT5X5, 5, 2, 3>(&mut hashes);
     hash_cases::<BlueSkyConfigT5X5, 5, 1, 4>(&mut hashes);
+    hash_cases::<BlueSkyConfigT3X7, 3, 3, 0>(&mut hashes);
+    hash_cases::<BlueSkyConfigT3X7, 3, 2, 1>(&mut hashes);
+    hash_cases::<BlueSkyConfigT3X7, 3, 1, 2>(&mut hashes);
+    hash_cases::<BlueSkyConfigT4X7, 4, 4, 0>(&mut hashes);
+    hash_cases::<BlueSkyConfigT4X7, 4, 3, 1>(&mut hashes);
+    hash_cases::<BlueSkyConfigT4X7, 4, 2, 2>(&mut hashes);
+    hash_cases::<BlueSkyConfigT4X7, 4, 1, 3>(&mut hashes);
+    hash_cases::<BlueSkyConfigT5X7, 5, 5, 0>(&mut hashes);
+    hash_cases::<BlueSkyConfigT5X7, 5, 4, 1>(&mut hashes);
+    hash_cases::<BlueSkyConfigT5X7, 5, 3, 2>(&mut hashes);
+    hash_cases::<BlueSkyConfigT5X7, 5, 2, 3>(&mut hashes);
+    hash_cases::<BlueSkyConfigT5X7, 5, 1, 4>(&mut hashes);
 
     let vectors = Vectors {
         permutations,
