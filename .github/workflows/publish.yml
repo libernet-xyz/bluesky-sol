@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      # Lets npm authenticate with trusted publishing (OIDC) once it's configured on npmjs.com.
+      # Lets npm authenticate with trusted publishing (OIDC), configured on npmjs.com.
       id-token: write
     steps:
       - uses: actions/checkout@v4
@@ -45,7 +45,7 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
 
-      - name: Publish to NPM
-        run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # The trusted publisher may only stage the package: a maintainer then publishes it with 2FA,
+      # e.g. with `npm stage list` and `npm stage approve <stage-id>`.
+      - name: Stage the package on NPM
+        run: npm stage publish --provenance
