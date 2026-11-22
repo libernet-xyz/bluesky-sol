@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Generates `contracts/Poseidon1.sol`: the Poseidon1 permutations over BlueSky supported by the
-//! Solidity library, each one in its own library, plus the sponge built on them.
+//! Solidity library, each one in its own library together with the sponge built on it.
 //!
 //! The round constants, the MDS matrices, and the number of rounds come from the configurations of
 //! the `starkom-poseidon` crate, so the generated permutations match the Rust ones by construction.
@@ -157,102 +157,16 @@ fn permutation_library(parameters: &Parameters) -> String {
     }
     format!(
         r#"/// @title {library}
-/// @notice The Poseidon1 permutation over BlueSky with state width {width} and S-box x^{alpha}.
-/// @dev Matches `permutation::<{config}, Scalar, {width}>` of the `starkom-poseidon` crate.
-/// @dev There are {full} full rounds, {partial} partial rounds, and {full} more full rounds. Every
-///   round adds its {width} round constants, applies the S-box to every element (full rounds) or
-///   only to the first one (partial rounds), and multiplies the state by the MDS matrix.
+/// @notice The Poseidon1 permutation over BlueSky with state width {width} and S-box x^{alpha}, and
+///   the sponge built on it.
+/// @dev Matches `permutation::<{config}, Scalar, {width}>`, `hash`, and `hash0` of the
+///   `starkom-poseidon` crate.
 /// @dev The round constants and the MDS matrix are hard-coded rather than stored, but they take a
 ///   large share of the contract size limit, so this library must be deployed on its own and
-///   linked by its users, e.g. through `Poseidon1Sponge`.
+///   linked by its users, which call its functions with `DELEGATECALL`. The sponge functions are
+///   in the same library so that they call the permutation internally rather than with a
+///   `DELEGATECALL` per block.
 library {library} {{
-  /// @notice Applies the permutation to a state.
-  /// @param state The state, every element in [0, p). Elements outside the range are reduced
-  ///   modulo p by the first round, so they alias canonical ones.
-  /// @return The permuted state, every element in [0, p).
-  function permute(
-    uint256[{width}] memory state
-  ) external pure returns (uint256[{width}] memory) {{
-    assembly ("memory-safe") {{
-{body}    }}
-    return state;
-  }}
-}}
-"#,
-        library = parameters.library_name(),
-        width = width,
-        alpha = parameters.alpha,
-        config = parameters.config_name,
-        full = full,
-        partial = partial,
-        body = body,
-    )
-}
-
-fn sponge_functions(parameters: &Parameters) -> String {
-    format!(
-        r#"
-  /// @notice Hashes `inputs` with the `{library}` permutation, returning the whole rate.
-  /// @dev Matches `hash::<{config}, Scalar, {width}, R, C>`.
-  /// @param dst The domain separator tags, which initialize the capacity elements. Their number
-  ///   is the capacity C, which must be less than {width}. Every tag must be in [0, p).
-  /// @param inputs The inputs, every one in [0, p). There must be at least one.
-  /// @return output The R = {width} - C elements of the rate after the last permutation.
-  function hash{suffix}(
-    uint256[] memory dst,
-    uint256[] memory inputs
-  ) internal pure returns (uint256[] memory output) {{
-    uint256 rate = _rate(dst, inputs, {width});
-    uint256[{width}] memory state;
-    for (uint256 i = 0; i < dst.length; i++) {{
-      state[rate + i] = dst[i];
-    }}
-    for (uint256 offset = 0; offset < inputs.length; offset += rate) {{
-      for (uint256 i = 0; i < rate && offset + i < inputs.length; i++) {{
-        state[i] = addmod(state[i], inputs[offset + i], P);
-      }}
-      state = {library}.permute(state);
-    }}
-    output = new uint256[](rate);
-    for (uint256 i = 0; i < rate; i++) {{
-      output[i] = state[i];
-    }}
-  }}
-
-  /// @notice Hashes `inputs` with the `{library}` permutation, returning the first element of
-  ///   the rate (see `hash{suffix}`).
-  /// @dev Matches `hash0::<{config}, Scalar, {width}, R, C>`.
-  function hash0{suffix}(
-    uint256[] memory dst,
-    uint256[] memory inputs
-  ) internal pure returns (uint256) {{
-    return hash{suffix}(dst, inputs)[0];
-  }}
-"#,
-        library = parameters.library_name(),
-        config = parameters.config_name,
-        width = parameters.width,
-        suffix = parameters.suffix(),
-    )
-}
-
-fn sponge_library(permutations: &[Parameters]) -> String {
-    let functions: String = permutations.iter().map(sponge_functions).collect();
-    format!(
-        r#"/// @title Poseidon1Sponge
-/// @notice The Poseidon1 sponge over BlueSky, built on the permutation libraries in this file.
-/// @dev Matches `hash` and `hash0` of the `starkom-poseidon` crate. The domain separator tags
-///   `dst` initialize the capacity elements state[R..T], so the capacity is C = dst.length and the
-///   rate is R = T - C. The inputs are absorbed R at a time by adding them to state[0..R], and the
-///   state is permuted after every block, the last one included. The output is state[0..R] after
-///   the last permutation.
-/// @dev WARNING: the last block is implicitly padded with zeros, so for example with rate 3 the
-///   inputs [1, 2] and [1, 2, 0] collide. That's fine for inputs whose length is fixed by the
-///   protocol, but otherwise the length must be prepended to the inputs. Also note that a zero
-///   capacity leaves the sponge without security margin, so protocols should use at least one tag.
-/// @dev All the functions are internal, so they're linked statically into their callers, while
-///   every permutation is an external call to its separately deployed library.
-library Poseidon1Sponge {{
   /// @dev Reverted when the capacity, i.e. the number of domain separator tags, is not less than
   ///   the state width, so that there's no room for the inputs.
   error InvalidCapacity(uint256 capacity, uint256 width);
@@ -266,16 +180,85 @@ library Poseidon1Sponge {{
 
   /// @dev The BlueSky prime p.
   uint256 private constant P = {MODULUS};
-{functions}
-  /// @dev Checks the arguments of a hash with state width `width`, reverting if they're invalid,
-  ///   and returns its rate.
+
+  /// @notice Applies the permutation to a state.
+  /// @dev There are {full} full rounds, {partial} partial rounds, and {full} more full rounds. Every
+  ///   round adds its {width} round constants, applies the S-box to every element (full rounds) or
+  ///   only to the first one (partial rounds), and multiplies the state by the MDS matrix.
+  ///
+  ///   The function is public rather than external so that the sponge functions can call it
+  ///   internally.
+  /// @param state The state, every element in [0, p). Elements outside the range are reduced
+  ///   modulo p by the first round, so they alias canonical ones.
+  /// @return The permuted state, every element in [0, p).
+  function permute(
+    uint256[{width}] memory state
+  ) public pure returns (uint256[{width}] memory) {{
+    assembly ("memory-safe") {{
+{body}    }}
+    return state;
+  }}
+
+  /// @notice Hashes `inputs` with the sponge, returning the whole rate.
+  /// @dev Matches `hash::<{config}, Scalar, {width}, R, C>`. The domain separator tags `dst`
+  ///   initialize the capacity elements state[R..{width}], so the capacity is C = dst.length and the
+  ///   rate is R = {width} - C. The inputs are absorbed R at a time by adding them to state[0..R],
+  ///   and the state is permuted after every block, the last one included. The output is
+  ///   state[0..R] after the last permutation.
+  /// @dev WARNING: the last block is implicitly padded with zeros, so for example with rate 3 the
+  ///   inputs [1, 2] and [1, 2, 0] collide. That's fine for inputs whose length is fixed by the
+  ///   protocol, but otherwise the length must be prepended to the inputs. Also note that a zero
+  ///   capacity leaves the sponge without security margin, so protocols should use at least one tag.
+  /// @param dst The domain separator tags, which initialize the capacity elements. Their number
+  ///   is the capacity C, which must be less than {width}. Every tag must be in [0, p).
+  /// @param inputs The inputs, every one in [0, p). There must be at least one.
+  /// @return output The R = {width} - C elements of the rate after the last permutation.
+  function hash(
+    uint256[] calldata dst,
+    uint256[] calldata inputs
+  ) external pure returns (uint256[] memory output) {{
+    (uint256[{width}] memory state, uint256 rate) = _absorb(dst, inputs);
+    output = new uint256[](rate);
+    for (uint256 i = 0; i < rate; i++) {{
+      output[i] = state[i];
+    }}
+  }}
+
+  /// @notice Hashes `inputs` with the sponge, returning the first element of the rate (see `hash`).
+  /// @dev Matches `hash0::<{config}, Scalar, {width}, R, C>`.
+  function hash0(
+    uint256[] calldata dst,
+    uint256[] calldata inputs
+  ) external pure returns (uint256) {{
+    (uint256[{width}] memory state, ) = _absorb(dst, inputs);
+    return state[0];
+  }}
+
+  /// @dev Checks the arguments of a hash, reverting if they're invalid, and absorbs `inputs` into
+  ///   a state whose capacity is initialized with `dst`. Returns the final state and the rate.
+  function _absorb(
+    uint256[] calldata dst,
+    uint256[] calldata inputs
+  ) private pure returns (uint256[{width}] memory state, uint256 rate) {{
+    rate = _rate(dst, inputs);
+    for (uint256 i = 0; i < dst.length; i++) {{
+      state[rate + i] = dst[i];
+    }}
+    for (uint256 offset = 0; offset < inputs.length; offset += rate) {{
+      for (uint256 i = 0; i < rate && offset + i < inputs.length; i++) {{
+        state[i] = addmod(state[i], inputs[offset + i], P);
+      }}
+      state = permute(state);
+    }}
+  }}
+
+  /// @dev Checks the arguments of a hash, reverting if they're invalid, and returns its rate.
   function _rate(
-    uint256[] memory dst,
-    uint256[] memory inputs,
-    uint256 width
+    uint256[] calldata dst,
+    uint256[] calldata inputs
   ) private pure returns (uint256) {{
-    if (dst.length >= width) {{
-      revert InvalidCapacity(dst.length, width);
+    if (dst.length >= {width}) {{
+      revert InvalidCapacity(dst.length, {width});
     }}
     if (inputs.length == 0) {{
       revert EmptyInput();
@@ -286,7 +269,7 @@ library Poseidon1Sponge {{
     for (uint256 i = 0; i < inputs.length; i++) {{
       _checkCanonical(inputs[i]);
     }}
-    return width - dst.length;
+    return {width} - dst.length;
   }}
 
   /// @dev Reverts if `value` is not a canonical field element.
@@ -296,7 +279,14 @@ library Poseidon1Sponge {{
     }}
   }}
 }}
-"#
+"#,
+        library = parameters.library_name(),
+        width = width,
+        alpha = parameters.alpha,
+        config = parameters.config_name,
+        full = full,
+        partial = partial,
+        body = body,
     )
 }
 
@@ -318,8 +308,6 @@ pragma solidity ^0.8.34;
 
 "#
     );
-    for parameters in &permutations {
-        println!("{}", permutation_library(parameters));
-    }
-    print!("{}", sponge_library(&permutations));
+    let libraries: Vec<String> = permutations.iter().map(permutation_library).collect();
+    print!("{}", libraries.join("\n"));
 }

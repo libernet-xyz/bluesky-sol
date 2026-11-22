@@ -1,5 +1,6 @@
 import { expect } from "chai";
 import { network } from "hardhat";
+import type { BaseContract } from "ethers";
 import { readFileSync } from "node:fs";
 import type { Poseidon1Harness } from "../types/ethers-contracts/index.js";
 
@@ -94,15 +95,18 @@ function counting(width: number): bigint[] {
 
 describe("Poseidon1", function () {
   let harness: Poseidon1Harness;
-  const libraries: Record<string, string> = {};
+
+  /** The deployed libraries by name. They also define the errors of the sponge functions. */
+  const libraries: Record<string, BaseContract> = {};
 
   before(async function () {
+    const addresses: Record<string, string> = {};
     for (const { width, alpha } of PERMUTATIONS) {
       const name = `Poseidon1${suffix(width, alpha)}`;
-      const library = await ethers.deployContract(name);
-      libraries[name] = await library.getAddress();
+      libraries[name] = await ethers.deployContract(name);
+      addresses[name] = await libraries[name].getAddress();
     }
-    harness = await ethers.deployContract("Poseidon1Harness", [], { libraries });
+    harness = await ethers.deployContract("Poseidon1Harness", [], { libraries: addresses });
   });
 
   function permute(width: number, alpha: number, state: bigint[]): Promise<bigint[]> {
@@ -179,35 +183,36 @@ describe("Poseidon1", function () {
 
     for (const { width, alpha } of PERMUTATIONS) {
       const name = suffix(width, alpha);
+      const libraryName = `Poseidon1${name}`;
 
       it(`hash${name} rejects empty inputs`, async function () {
         await expect(hash(width, alpha, [0n], [])).to.be.revertedWithCustomError(
-          harness,
+          libraries[libraryName],
           "EmptyInput",
         );
       });
 
       it(`hash${name} rejects a capacity equal to the width`, async function () {
         await expect(hash(width, alpha, new Array(width).fill(0n), [1n]))
-          .to.be.revertedWithCustomError(harness, "InvalidCapacity")
+          .to.be.revertedWithCustomError(libraries[libraryName], "InvalidCapacity")
           .withArgs(width, width);
       });
 
       it(`hash${name} rejects a capacity larger than the width`, async function () {
         await expect(hash(width, alpha, new Array(width + 1).fill(0n), [1n]))
-          .to.be.revertedWithCustomError(harness, "InvalidCapacity")
+          .to.be.revertedWithCustomError(libraries[libraryName], "InvalidCapacity")
           .withArgs(width + 1, width);
       });
 
       it(`hash${name} rejects a non-canonical input`, async function () {
         await expect(hash(width, alpha, [0n], [1n, P]))
-          .to.be.revertedWithCustomError(harness, "NonCanonicalInput")
+          .to.be.revertedWithCustomError(libraries[libraryName], "NonCanonicalInput")
           .withArgs(P);
       });
 
       it(`hash${name} rejects a non-canonical tag`, async function () {
         await expect(hash(width, alpha, [P + 1n], [1n]))
-          .to.be.revertedWithCustomError(harness, "NonCanonicalInput")
+          .to.be.revertedWithCustomError(libraries[libraryName], "NonCanonicalInput")
           .withArgs(P + 1n);
       });
     }
