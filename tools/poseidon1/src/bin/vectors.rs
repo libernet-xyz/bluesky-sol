@@ -6,8 +6,8 @@
 //!
 //! Every field element is a 0x-prefixed hex string.
 //!
-//! The output isn't formatted: run `npm run vectors` from the root of the repository, which writes
-//! it to `test/vectors/poseidon1.json` and formats it with prettier.
+//! The output isn't formatted: run `npm run vectors:poseidon1` from the root of the repository,
+//! which writes it to `test/vectors/poseidon1.json` and formats it with prettier.
 
 use serde::Serialize;
 use starkom_bluesky::{Scalar, from_const};

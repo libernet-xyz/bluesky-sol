@@ -5,20 +5,41 @@ pragma solidity ^0.8.34;
 // crate. Don't edit it by hand.
 
 /// @title Poseidon1T3X5
-/// @notice The Poseidon1 permutation over BlueSky with state width 3 and S-box x^5.
-/// @dev Matches `permutation::<BlueSkyConfigT3X5, Scalar, 3>` of the `starkom-poseidon` crate.
-/// @dev There are 4 full rounds, 56 partial rounds, and 4 more full rounds. Every
-///   round adds its 3 round constants, applies the S-box to every element (full rounds) or
-///   only to the first one (partial rounds), and multiplies the state by the MDS matrix.
+/// @notice The Poseidon1 permutation over BlueSky with state width 3 and S-box x^5, and
+///   the sponge built on it.
+/// @dev Matches `permutation::<BlueSkyConfigT3X5, Scalar, 3>`, `hash`, and `hash0` of the
+///   `starkom-poseidon` crate.
 /// @dev The round constants and the MDS matrix are hard-coded rather than stored, but they take a
 ///   large share of the contract size limit, so this library must be deployed on its own and
-///   linked by its users, e.g. through `Poseidon1Sponge`.
+///   linked by its users, which call its functions with `DELEGATECALL`. The sponge functions are
+///   in the same library so that they call the permutation internally rather than with a
+///   `DELEGATECALL` per block.
 library Poseidon1T3X5 {
+  /// @dev Reverted when the capacity, i.e. the number of domain separator tags, is not less than
+  ///   the state width, so that there's no room for the inputs.
+  error InvalidCapacity(uint256 capacity, uint256 width);
+
+  /// @dev Reverted when there are no inputs to hash.
+  error EmptyInput();
+
+  /// @dev Reverted when an input or a domain separator tag is not a canonical field element,
+  ///   i.e. it's not in [0, p).
+  error NonCanonicalInput(uint256 value);
+
+  /// @dev The BlueSky prime p.
+  uint256 private constant P = 0x7ffffffffffffffffffffffffffffffe0673ddf29e9b5547c000000000000001;
+
   /// @notice Applies the permutation to a state.
+  /// @dev There are 4 full rounds, 56 partial rounds, and 4 more full rounds. Every
+  ///   round adds its 3 round constants, applies the S-box to every element (full rounds) or
+  ///   only to the first one (partial rounds), and multiplies the state by the MDS matrix.
+  ///
+  ///   The function is public rather than external so that the sponge functions can call it
+  ///   internally.
   /// @param state The state, every element in [0, p). Elements outside the range are reduced
   ///   modulo p by the first round, so they alias canonical ones.
   /// @return The permuted state, every element in [0, p).
-  function permute(uint256[3] memory state) external pure returns (uint256[3] memory) {
+  function permute(uint256[3] memory state) public pure returns (uint256[3] memory) {
     assembly ("memory-safe") {
       // Multiplies the state by the MDS matrix.
       function mds(s0, s1, s2) -> n0, n1, n2 {
@@ -787,23 +808,121 @@ library Poseidon1T3X5 {
     }
     return state;
   }
+
+  /// @notice Hashes `inputs` with the sponge, returning the whole rate.
+  /// @dev Matches `hash::<BlueSkyConfigT3X5, Scalar, 3, R, C>`. The domain separator tags `dst`
+  ///   initialize the capacity elements state[R..3], so the capacity is C = dst.length and the
+  ///   rate is R = 3 - C. The inputs are absorbed R at a time by adding them to state[0..R],
+  ///   and the state is permuted after every block, the last one included. The output is
+  ///   state[0..R] after the last permutation.
+  /// @dev WARNING: the last block is implicitly padded with zeros, so for example with rate 3 the
+  ///   inputs [1, 2] and [1, 2, 0] collide. That's fine for inputs whose length is fixed by the
+  ///   protocol, but otherwise the length must be prepended to the inputs. Also note that a zero
+  ///   capacity leaves the sponge without security margin, so protocols should use at least one tag.
+  /// @param dst The domain separator tags, which initialize the capacity elements. Their number
+  ///   is the capacity C, which must be less than 3. Every tag must be in [0, p).
+  /// @param inputs The inputs, every one in [0, p). There must be at least one.
+  /// @return output The R = 3 - C elements of the rate after the last permutation.
+  function hash(
+    uint256[] calldata dst,
+    uint256[] calldata inputs
+  ) external pure returns (uint256[] memory output) {
+    (uint256[3] memory state, uint256 rate) = _absorb(dst, inputs);
+    output = new uint256[](rate);
+    for (uint256 i = 0; i < rate; i++) {
+      output[i] = state[i];
+    }
+  }
+
+  /// @notice Hashes `inputs` with the sponge, returning the first element of the rate (see `hash`).
+  /// @dev Matches `hash0::<BlueSkyConfigT3X5, Scalar, 3, R, C>`.
+  function hash0(
+    uint256[] calldata dst,
+    uint256[] calldata inputs
+  ) external pure returns (uint256) {
+    (uint256[3] memory state, ) = _absorb(dst, inputs);
+    return state[0];
+  }
+
+  /// @dev Checks the arguments of a hash, reverting if they're invalid, and absorbs `inputs` into
+  ///   a state whose capacity is initialized with `dst`. Returns the final state and the rate.
+  function _absorb(
+    uint256[] calldata dst,
+    uint256[] calldata inputs
+  ) private pure returns (uint256[3] memory state, uint256 rate) {
+    rate = _rate(dst, inputs);
+    for (uint256 i = 0; i < dst.length; i++) {
+      state[rate + i] = dst[i];
+    }
+    for (uint256 offset = 0; offset < inputs.length; offset += rate) {
+      for (uint256 i = 0; i < rate && offset + i < inputs.length; i++) {
+        state[i] = addmod(state[i], inputs[offset + i], P);
+      }
+      state = permute(state);
+    }
+  }
+
+  /// @dev Checks the arguments of a hash, reverting if they're invalid, and returns its rate.
+  function _rate(uint256[] calldata dst, uint256[] calldata inputs) private pure returns (uint256) {
+    if (dst.length >= 3) {
+      revert InvalidCapacity(dst.length, 3);
+    }
+    if (inputs.length == 0) {
+      revert EmptyInput();
+    }
+    for (uint256 i = 0; i < dst.length; i++) {
+      _checkCanonical(dst[i]);
+    }
+    for (uint256 i = 0; i < inputs.length; i++) {
+      _checkCanonical(inputs[i]);
+    }
+    return 3 - dst.length;
+  }
+
+  /// @dev Reverts if `value` is not a canonical field element.
+  function _checkCanonical(uint256 value) private pure {
+    if (value >= P) {
+      revert NonCanonicalInput(value);
+    }
+  }
 }
 
 /// @title Poseidon1T4X5
-/// @notice The Poseidon1 permutation over BlueSky with state width 4 and S-box x^5.
-/// @dev Matches `permutation::<BlueSkyConfigT4X5, Scalar, 4>` of the `starkom-poseidon` crate.
-/// @dev There are 4 full rounds, 56 partial rounds, and 4 more full rounds. Every
-///   round adds its 4 round constants, applies the S-box to every element (full rounds) or
-///   only to the first one (partial rounds), and multiplies the state by the MDS matrix.
+/// @notice The Poseidon1 permutation over BlueSky with state width 4 and S-box x^5, and
+///   the sponge built on it.
+/// @dev Matches `permutation::<BlueSkyConfigT4X5, Scalar, 4>`, `hash`, and `hash0` of the
+///   `starkom-poseidon` crate.
 /// @dev The round constants and the MDS matrix are hard-coded rather than stored, but they take a
 ///   large share of the contract size limit, so this library must be deployed on its own and
-///   linked by its users, e.g. through `Poseidon1Sponge`.
+///   linked by its users, which call its functions with `DELEGATECALL`. The sponge functions are
+///   in the same library so that they call the permutation internally rather than with a
+///   `DELEGATECALL` per block.
 library Poseidon1T4X5 {
+  /// @dev Reverted when the capacity, i.e. the number of domain separator tags, is not less than
+  ///   the state width, so that there's no room for the inputs.
+  error InvalidCapacity(uint256 capacity, uint256 width);
+
+  /// @dev Reverted when there are no inputs to hash.
+  error EmptyInput();
+
+  /// @dev Reverted when an input or a domain separator tag is not a canonical field element,
+  ///   i.e. it's not in [0, p).
+  error NonCanonicalInput(uint256 value);
+
+  /// @dev The BlueSky prime p.
+  uint256 private constant P = 0x7ffffffffffffffffffffffffffffffe0673ddf29e9b5547c000000000000001;
+
   /// @notice Applies the permutation to a state.
+  /// @dev There are 4 full rounds, 56 partial rounds, and 4 more full rounds. Every
+  ///   round adds its 4 round constants, applies the S-box to every element (full rounds) or
+  ///   only to the first one (partial rounds), and multiplies the state by the MDS matrix.
+  ///
+  ///   The function is public rather than external so that the sponge functions can call it
+  ///   internally.
   /// @param state The state, every element in [0, p). Elements outside the range are reduced
   ///   modulo p by the first round, so they alias canonical ones.
   /// @return The permuted state, every element in [0, p).
-  function permute(uint256[4] memory state) external pure returns (uint256[4] memory) {
+  function permute(uint256[4] memory state) public pure returns (uint256[4] memory) {
     assembly ("memory-safe") {
       // Multiplies the state by the MDS matrix.
       function mds(s0, s1, s2, s3) -> n0, n1, n2, n3 {
@@ -1709,23 +1828,121 @@ library Poseidon1T4X5 {
     }
     return state;
   }
+
+  /// @notice Hashes `inputs` with the sponge, returning the whole rate.
+  /// @dev Matches `hash::<BlueSkyConfigT4X5, Scalar, 4, R, C>`. The domain separator tags `dst`
+  ///   initialize the capacity elements state[R..4], so the capacity is C = dst.length and the
+  ///   rate is R = 4 - C. The inputs are absorbed R at a time by adding them to state[0..R],
+  ///   and the state is permuted after every block, the last one included. The output is
+  ///   state[0..R] after the last permutation.
+  /// @dev WARNING: the last block is implicitly padded with zeros, so for example with rate 3 the
+  ///   inputs [1, 2] and [1, 2, 0] collide. That's fine for inputs whose length is fixed by the
+  ///   protocol, but otherwise the length must be prepended to the inputs. Also note that a zero
+  ///   capacity leaves the sponge without security margin, so protocols should use at least one tag.
+  /// @param dst The domain separator tags, which initialize the capacity elements. Their number
+  ///   is the capacity C, which must be less than 4. Every tag must be in [0, p).
+  /// @param inputs The inputs, every one in [0, p). There must be at least one.
+  /// @return output The R = 4 - C elements of the rate after the last permutation.
+  function hash(
+    uint256[] calldata dst,
+    uint256[] calldata inputs
+  ) external pure returns (uint256[] memory output) {
+    (uint256[4] memory state, uint256 rate) = _absorb(dst, inputs);
+    output = new uint256[](rate);
+    for (uint256 i = 0; i < rate; i++) {
+      output[i] = state[i];
+    }
+  }
+
+  /// @notice Hashes `inputs` with the sponge, returning the first element of the rate (see `hash`).
+  /// @dev Matches `hash0::<BlueSkyConfigT4X5, Scalar, 4, R, C>`.
+  function hash0(
+    uint256[] calldata dst,
+    uint256[] calldata inputs
+  ) external pure returns (uint256) {
+    (uint256[4] memory state, ) = _absorb(dst, inputs);
+    return state[0];
+  }
+
+  /// @dev Checks the arguments of a hash, reverting if they're invalid, and absorbs `inputs` into
+  ///   a state whose capacity is initialized with `dst`. Returns the final state and the rate.
+  function _absorb(
+    uint256[] calldata dst,
+    uint256[] calldata inputs
+  ) private pure returns (uint256[4] memory state, uint256 rate) {
+    rate = _rate(dst, inputs);
+    for (uint256 i = 0; i < dst.length; i++) {
+      state[rate + i] = dst[i];
+    }
+    for (uint256 offset = 0; offset < inputs.length; offset += rate) {
+      for (uint256 i = 0; i < rate && offset + i < inputs.length; i++) {
+        state[i] = addmod(state[i], inputs[offset + i], P);
+      }
+      state = permute(state);
+    }
+  }
+
+  /// @dev Checks the arguments of a hash, reverting if they're invalid, and returns its rate.
+  function _rate(uint256[] calldata dst, uint256[] calldata inputs) private pure returns (uint256) {
+    if (dst.length >= 4) {
+      revert InvalidCapacity(dst.length, 4);
+    }
+    if (inputs.length == 0) {
+      revert EmptyInput();
+    }
+    for (uint256 i = 0; i < dst.length; i++) {
+      _checkCanonical(dst[i]);
+    }
+    for (uint256 i = 0; i < inputs.length; i++) {
+      _checkCanonical(inputs[i]);
+    }
+    return 4 - dst.length;
+  }
+
+  /// @dev Reverts if `value` is not a canonical field element.
+  function _checkCanonical(uint256 value) private pure {
+    if (value >= P) {
+      revert NonCanonicalInput(value);
+    }
+  }
 }
 
 /// @title Poseidon1T5X5
-/// @notice The Poseidon1 permutation over BlueSky with state width 5 and S-box x^5.
-/// @dev Matches `permutation::<BlueSkyConfigT5X5, Scalar, 5>` of the `starkom-poseidon` crate.
-/// @dev There are 4 full rounds, 56 partial rounds, and 4 more full rounds. Every
-///   round adds its 5 round constants, applies the S-box to every element (full rounds) or
-///   only to the first one (partial rounds), and multiplies the state by the MDS matrix.
+/// @notice The Poseidon1 permutation over BlueSky with state width 5 and S-box x^5, and
+///   the sponge built on it.
+/// @dev Matches `permutation::<BlueSkyConfigT5X5, Scalar, 5>`, `hash`, and `hash0` of the
+///   `starkom-poseidon` crate.
 /// @dev The round constants and the MDS matrix are hard-coded rather than stored, but they take a
 ///   large share of the contract size limit, so this library must be deployed on its own and
-///   linked by its users, e.g. through `Poseidon1Sponge`.
+///   linked by its users, which call its functions with `DELEGATECALL`. The sponge functions are
+///   in the same library so that they call the permutation internally rather than with a
+///   `DELEGATECALL` per block.
 library Poseidon1T5X5 {
+  /// @dev Reverted when the capacity, i.e. the number of domain separator tags, is not less than
+  ///   the state width, so that there's no room for the inputs.
+  error InvalidCapacity(uint256 capacity, uint256 width);
+
+  /// @dev Reverted when there are no inputs to hash.
+  error EmptyInput();
+
+  /// @dev Reverted when an input or a domain separator tag is not a canonical field element,
+  ///   i.e. it's not in [0, p).
+  error NonCanonicalInput(uint256 value);
+
+  /// @dev The BlueSky prime p.
+  uint256 private constant P = 0x7ffffffffffffffffffffffffffffffe0673ddf29e9b5547c000000000000001;
+
   /// @notice Applies the permutation to a state.
+  /// @dev There are 4 full rounds, 56 partial rounds, and 4 more full rounds. Every
+  ///   round adds its 5 round constants, applies the S-box to every element (full rounds) or
+  ///   only to the first one (partial rounds), and multiplies the state by the MDS matrix.
+  ///
+  ///   The function is public rather than external so that the sponge functions can call it
+  ///   internally.
   /// @param state The state, every element in [0, p). Elements outside the range are reduced
   ///   modulo p by the first round, so they alias canonical ones.
   /// @return The permuted state, every element in [0, p).
-  function permute(uint256[5] memory state) external pure returns (uint256[5] memory) {
+  function permute(uint256[5] memory state) public pure returns (uint256[5] memory) {
     assembly ("memory-safe") {
       // Multiplies the state by the MDS matrix.
       function mds(s0, s1, s2, s3, s4) -> n0, n1, n2, n3, n4 {
@@ -2778,23 +2995,121 @@ library Poseidon1T5X5 {
     }
     return state;
   }
+
+  /// @notice Hashes `inputs` with the sponge, returning the whole rate.
+  /// @dev Matches `hash::<BlueSkyConfigT5X5, Scalar, 5, R, C>`. The domain separator tags `dst`
+  ///   initialize the capacity elements state[R..5], so the capacity is C = dst.length and the
+  ///   rate is R = 5 - C. The inputs are absorbed R at a time by adding them to state[0..R],
+  ///   and the state is permuted after every block, the last one included. The output is
+  ///   state[0..R] after the last permutation.
+  /// @dev WARNING: the last block is implicitly padded with zeros, so for example with rate 3 the
+  ///   inputs [1, 2] and [1, 2, 0] collide. That's fine for inputs whose length is fixed by the
+  ///   protocol, but otherwise the length must be prepended to the inputs. Also note that a zero
+  ///   capacity leaves the sponge without security margin, so protocols should use at least one tag.
+  /// @param dst The domain separator tags, which initialize the capacity elements. Their number
+  ///   is the capacity C, which must be less than 5. Every tag must be in [0, p).
+  /// @param inputs The inputs, every one in [0, p). There must be at least one.
+  /// @return output The R = 5 - C elements of the rate after the last permutation.
+  function hash(
+    uint256[] calldata dst,
+    uint256[] calldata inputs
+  ) external pure returns (uint256[] memory output) {
+    (uint256[5] memory state, uint256 rate) = _absorb(dst, inputs);
+    output = new uint256[](rate);
+    for (uint256 i = 0; i < rate; i++) {
+      output[i] = state[i];
+    }
+  }
+
+  /// @notice Hashes `inputs` with the sponge, returning the first element of the rate (see `hash`).
+  /// @dev Matches `hash0::<BlueSkyConfigT5X5, Scalar, 5, R, C>`.
+  function hash0(
+    uint256[] calldata dst,
+    uint256[] calldata inputs
+  ) external pure returns (uint256) {
+    (uint256[5] memory state, ) = _absorb(dst, inputs);
+    return state[0];
+  }
+
+  /// @dev Checks the arguments of a hash, reverting if they're invalid, and absorbs `inputs` into
+  ///   a state whose capacity is initialized with `dst`. Returns the final state and the rate.
+  function _absorb(
+    uint256[] calldata dst,
+    uint256[] calldata inputs
+  ) private pure returns (uint256[5] memory state, uint256 rate) {
+    rate = _rate(dst, inputs);
+    for (uint256 i = 0; i < dst.length; i++) {
+      state[rate + i] = dst[i];
+    }
+    for (uint256 offset = 0; offset < inputs.length; offset += rate) {
+      for (uint256 i = 0; i < rate && offset + i < inputs.length; i++) {
+        state[i] = addmod(state[i], inputs[offset + i], P);
+      }
+      state = permute(state);
+    }
+  }
+
+  /// @dev Checks the arguments of a hash, reverting if they're invalid, and returns its rate.
+  function _rate(uint256[] calldata dst, uint256[] calldata inputs) private pure returns (uint256) {
+    if (dst.length >= 5) {
+      revert InvalidCapacity(dst.length, 5);
+    }
+    if (inputs.length == 0) {
+      revert EmptyInput();
+    }
+    for (uint256 i = 0; i < dst.length; i++) {
+      _checkCanonical(dst[i]);
+    }
+    for (uint256 i = 0; i < inputs.length; i++) {
+      _checkCanonical(inputs[i]);
+    }
+    return 5 - dst.length;
+  }
+
+  /// @dev Reverts if `value` is not a canonical field element.
+  function _checkCanonical(uint256 value) private pure {
+    if (value >= P) {
+      revert NonCanonicalInput(value);
+    }
+  }
 }
 
 /// @title Poseidon1T3X7
-/// @notice The Poseidon1 permutation over BlueSky with state width 3 and S-box x^7.
-/// @dev Matches `permutation::<BlueSkyConfigT3X7, Scalar, 3>` of the `starkom-poseidon` crate.
-/// @dev There are 4 full rounds, 46 partial rounds, and 4 more full rounds. Every
-///   round adds its 3 round constants, applies the S-box to every element (full rounds) or
-///   only to the first one (partial rounds), and multiplies the state by the MDS matrix.
+/// @notice The Poseidon1 permutation over BlueSky with state width 3 and S-box x^7, and
+///   the sponge built on it.
+/// @dev Matches `permutation::<BlueSkyConfigT3X7, Scalar, 3>`, `hash`, and `hash0` of the
+///   `starkom-poseidon` crate.
 /// @dev The round constants and the MDS matrix are hard-coded rather than stored, but they take a
 ///   large share of the contract size limit, so this library must be deployed on its own and
-///   linked by its users, e.g. through `Poseidon1Sponge`.
+///   linked by its users, which call its functions with `DELEGATECALL`. The sponge functions are
+///   in the same library so that they call the permutation internally rather than with a
+///   `DELEGATECALL` per block.
 library Poseidon1T3X7 {
+  /// @dev Reverted when the capacity, i.e. the number of domain separator tags, is not less than
+  ///   the state width, so that there's no room for the inputs.
+  error InvalidCapacity(uint256 capacity, uint256 width);
+
+  /// @dev Reverted when there are no inputs to hash.
+  error EmptyInput();
+
+  /// @dev Reverted when an input or a domain separator tag is not a canonical field element,
+  ///   i.e. it's not in [0, p).
+  error NonCanonicalInput(uint256 value);
+
+  /// @dev The BlueSky prime p.
+  uint256 private constant P = 0x7ffffffffffffffffffffffffffffffe0673ddf29e9b5547c000000000000001;
+
   /// @notice Applies the permutation to a state.
+  /// @dev There are 4 full rounds, 46 partial rounds, and 4 more full rounds. Every
+  ///   round adds its 3 round constants, applies the S-box to every element (full rounds) or
+  ///   only to the first one (partial rounds), and multiplies the state by the MDS matrix.
+  ///
+  ///   The function is public rather than external so that the sponge functions can call it
+  ///   internally.
   /// @param state The state, every element in [0, p). Elements outside the range are reduced
   ///   modulo p by the first round, so they alias canonical ones.
   /// @return The permuted state, every element in [0, p).
-  function permute(uint256[3] memory state) external pure returns (uint256[3] memory) {
+  function permute(uint256[3] memory state) public pure returns (uint256[3] memory) {
     assembly ("memory-safe") {
       // Multiplies the state by the MDS matrix.
       function mds(s0, s1, s2) -> n0, n1, n2 {
@@ -3533,23 +3848,121 @@ library Poseidon1T3X7 {
     }
     return state;
   }
+
+  /// @notice Hashes `inputs` with the sponge, returning the whole rate.
+  /// @dev Matches `hash::<BlueSkyConfigT3X7, Scalar, 3, R, C>`. The domain separator tags `dst`
+  ///   initialize the capacity elements state[R..3], so the capacity is C = dst.length and the
+  ///   rate is R = 3 - C. The inputs are absorbed R at a time by adding them to state[0..R],
+  ///   and the state is permuted after every block, the last one included. The output is
+  ///   state[0..R] after the last permutation.
+  /// @dev WARNING: the last block is implicitly padded with zeros, so for example with rate 3 the
+  ///   inputs [1, 2] and [1, 2, 0] collide. That's fine for inputs whose length is fixed by the
+  ///   protocol, but otherwise the length must be prepended to the inputs. Also note that a zero
+  ///   capacity leaves the sponge without security margin, so protocols should use at least one tag.
+  /// @param dst The domain separator tags, which initialize the capacity elements. Their number
+  ///   is the capacity C, which must be less than 3. Every tag must be in [0, p).
+  /// @param inputs The inputs, every one in [0, p). There must be at least one.
+  /// @return output The R = 3 - C elements of the rate after the last permutation.
+  function hash(
+    uint256[] calldata dst,
+    uint256[] calldata inputs
+  ) external pure returns (uint256[] memory output) {
+    (uint256[3] memory state, uint256 rate) = _absorb(dst, inputs);
+    output = new uint256[](rate);
+    for (uint256 i = 0; i < rate; i++) {
+      output[i] = state[i];
+    }
+  }
+
+  /// @notice Hashes `inputs` with the sponge, returning the first element of the rate (see `hash`).
+  /// @dev Matches `hash0::<BlueSkyConfigT3X7, Scalar, 3, R, C>`.
+  function hash0(
+    uint256[] calldata dst,
+    uint256[] calldata inputs
+  ) external pure returns (uint256) {
+    (uint256[3] memory state, ) = _absorb(dst, inputs);
+    return state[0];
+  }
+
+  /// @dev Checks the arguments of a hash, reverting if they're invalid, and absorbs `inputs` into
+  ///   a state whose capacity is initialized with `dst`. Returns the final state and the rate.
+  function _absorb(
+    uint256[] calldata dst,
+    uint256[] calldata inputs
+  ) private pure returns (uint256[3] memory state, uint256 rate) {
+    rate = _rate(dst, inputs);
+    for (uint256 i = 0; i < dst.length; i++) {
+      state[rate + i] = dst[i];
+    }
+    for (uint256 offset = 0; offset < inputs.length; offset += rate) {
+      for (uint256 i = 0; i < rate && offset + i < inputs.length; i++) {
+        state[i] = addmod(state[i], inputs[offset + i], P);
+      }
+      state = permute(state);
+    }
+  }
+
+  /// @dev Checks the arguments of a hash, reverting if they're invalid, and returns its rate.
+  function _rate(uint256[] calldata dst, uint256[] calldata inputs) private pure returns (uint256) {
+    if (dst.length >= 3) {
+      revert InvalidCapacity(dst.length, 3);
+    }
+    if (inputs.length == 0) {
+      revert EmptyInput();
+    }
+    for (uint256 i = 0; i < dst.length; i++) {
+      _checkCanonical(dst[i]);
+    }
+    for (uint256 i = 0; i < inputs.length; i++) {
+      _checkCanonical(inputs[i]);
+    }
+    return 3 - dst.length;
+  }
+
+  /// @dev Reverts if `value` is not a canonical field element.
+  function _checkCanonical(uint256 value) private pure {
+    if (value >= P) {
+      revert NonCanonicalInput(value);
+    }
+  }
 }
 
 /// @title Poseidon1T4X7
-/// @notice The Poseidon1 permutation over BlueSky with state width 4 and S-box x^7.
-/// @dev Matches `permutation::<BlueSkyConfigT4X7, Scalar, 4>` of the `starkom-poseidon` crate.
-/// @dev There are 4 full rounds, 46 partial rounds, and 4 more full rounds. Every
-///   round adds its 4 round constants, applies the S-box to every element (full rounds) or
-///   only to the first one (partial rounds), and multiplies the state by the MDS matrix.
+/// @notice The Poseidon1 permutation over BlueSky with state width 4 and S-box x^7, and
+///   the sponge built on it.
+/// @dev Matches `permutation::<BlueSkyConfigT4X7, Scalar, 4>`, `hash`, and `hash0` of the
+///   `starkom-poseidon` crate.
 /// @dev The round constants and the MDS matrix are hard-coded rather than stored, but they take a
 ///   large share of the contract size limit, so this library must be deployed on its own and
-///   linked by its users, e.g. through `Poseidon1Sponge`.
+///   linked by its users, which call its functions with `DELEGATECALL`. The sponge functions are
+///   in the same library so that they call the permutation internally rather than with a
+///   `DELEGATECALL` per block.
 library Poseidon1T4X7 {
+  /// @dev Reverted when the capacity, i.e. the number of domain separator tags, is not less than
+  ///   the state width, so that there's no room for the inputs.
+  error InvalidCapacity(uint256 capacity, uint256 width);
+
+  /// @dev Reverted when there are no inputs to hash.
+  error EmptyInput();
+
+  /// @dev Reverted when an input or a domain separator tag is not a canonical field element,
+  ///   i.e. it's not in [0, p).
+  error NonCanonicalInput(uint256 value);
+
+  /// @dev The BlueSky prime p.
+  uint256 private constant P = 0x7ffffffffffffffffffffffffffffffe0673ddf29e9b5547c000000000000001;
+
   /// @notice Applies the permutation to a state.
+  /// @dev There are 4 full rounds, 46 partial rounds, and 4 more full rounds. Every
+  ///   round adds its 4 round constants, applies the S-box to every element (full rounds) or
+  ///   only to the first one (partial rounds), and multiplies the state by the MDS matrix.
+  ///
+  ///   The function is public rather than external so that the sponge functions can call it
+  ///   internally.
   /// @param state The state, every element in [0, p). Elements outside the range are reduced
   ///   modulo p by the first round, so they alias canonical ones.
   /// @return The permuted state, every element in [0, p).
-  function permute(uint256[4] memory state) external pure returns (uint256[4] memory) {
+  function permute(uint256[4] memory state) public pure returns (uint256[4] memory) {
     assembly ("memory-safe") {
       // Multiplies the state by the MDS matrix.
       function mds(s0, s1, s2, s3) -> n0, n1, n2, n3 {
@@ -4423,23 +4836,121 @@ library Poseidon1T4X7 {
     }
     return state;
   }
+
+  /// @notice Hashes `inputs` with the sponge, returning the whole rate.
+  /// @dev Matches `hash::<BlueSkyConfigT4X7, Scalar, 4, R, C>`. The domain separator tags `dst`
+  ///   initialize the capacity elements state[R..4], so the capacity is C = dst.length and the
+  ///   rate is R = 4 - C. The inputs are absorbed R at a time by adding them to state[0..R],
+  ///   and the state is permuted after every block, the last one included. The output is
+  ///   state[0..R] after the last permutation.
+  /// @dev WARNING: the last block is implicitly padded with zeros, so for example with rate 3 the
+  ///   inputs [1, 2] and [1, 2, 0] collide. That's fine for inputs whose length is fixed by the
+  ///   protocol, but otherwise the length must be prepended to the inputs. Also note that a zero
+  ///   capacity leaves the sponge without security margin, so protocols should use at least one tag.
+  /// @param dst The domain separator tags, which initialize the capacity elements. Their number
+  ///   is the capacity C, which must be less than 4. Every tag must be in [0, p).
+  /// @param inputs The inputs, every one in [0, p). There must be at least one.
+  /// @return output The R = 4 - C elements of the rate after the last permutation.
+  function hash(
+    uint256[] calldata dst,
+    uint256[] calldata inputs
+  ) external pure returns (uint256[] memory output) {
+    (uint256[4] memory state, uint256 rate) = _absorb(dst, inputs);
+    output = new uint256[](rate);
+    for (uint256 i = 0; i < rate; i++) {
+      output[i] = state[i];
+    }
+  }
+
+  /// @notice Hashes `inputs` with the sponge, returning the first element of the rate (see `hash`).
+  /// @dev Matches `hash0::<BlueSkyConfigT4X7, Scalar, 4, R, C>`.
+  function hash0(
+    uint256[] calldata dst,
+    uint256[] calldata inputs
+  ) external pure returns (uint256) {
+    (uint256[4] memory state, ) = _absorb(dst, inputs);
+    return state[0];
+  }
+
+  /// @dev Checks the arguments of a hash, reverting if they're invalid, and absorbs `inputs` into
+  ///   a state whose capacity is initialized with `dst`. Returns the final state and the rate.
+  function _absorb(
+    uint256[] calldata dst,
+    uint256[] calldata inputs
+  ) private pure returns (uint256[4] memory state, uint256 rate) {
+    rate = _rate(dst, inputs);
+    for (uint256 i = 0; i < dst.length; i++) {
+      state[rate + i] = dst[i];
+    }
+    for (uint256 offset = 0; offset < inputs.length; offset += rate) {
+      for (uint256 i = 0; i < rate && offset + i < inputs.length; i++) {
+        state[i] = addmod(state[i], inputs[offset + i], P);
+      }
+      state = permute(state);
+    }
+  }
+
+  /// @dev Checks the arguments of a hash, reverting if they're invalid, and returns its rate.
+  function _rate(uint256[] calldata dst, uint256[] calldata inputs) private pure returns (uint256) {
+    if (dst.length >= 4) {
+      revert InvalidCapacity(dst.length, 4);
+    }
+    if (inputs.length == 0) {
+      revert EmptyInput();
+    }
+    for (uint256 i = 0; i < dst.length; i++) {
+      _checkCanonical(dst[i]);
+    }
+    for (uint256 i = 0; i < inputs.length; i++) {
+      _checkCanonical(inputs[i]);
+    }
+    return 4 - dst.length;
+  }
+
+  /// @dev Reverts if `value` is not a canonical field element.
+  function _checkCanonical(uint256 value) private pure {
+    if (value >= P) {
+      revert NonCanonicalInput(value);
+    }
+  }
 }
 
 /// @title Poseidon1T5X7
-/// @notice The Poseidon1 permutation over BlueSky with state width 5 and S-box x^7.
-/// @dev Matches `permutation::<BlueSkyConfigT5X7, Scalar, 5>` of the `starkom-poseidon` crate.
-/// @dev There are 4 full rounds, 46 partial rounds, and 4 more full rounds. Every
-///   round adds its 5 round constants, applies the S-box to every element (full rounds) or
-///   only to the first one (partial rounds), and multiplies the state by the MDS matrix.
+/// @notice The Poseidon1 permutation over BlueSky with state width 5 and S-box x^7, and
+///   the sponge built on it.
+/// @dev Matches `permutation::<BlueSkyConfigT5X7, Scalar, 5>`, `hash`, and `hash0` of the
+///   `starkom-poseidon` crate.
 /// @dev The round constants and the MDS matrix are hard-coded rather than stored, but they take a
 ///   large share of the contract size limit, so this library must be deployed on its own and
-///   linked by its users, e.g. through `Poseidon1Sponge`.
+///   linked by its users, which call its functions with `DELEGATECALL`. The sponge functions are
+///   in the same library so that they call the permutation internally rather than with a
+///   `DELEGATECALL` per block.
 library Poseidon1T5X7 {
+  /// @dev Reverted when the capacity, i.e. the number of domain separator tags, is not less than
+  ///   the state width, so that there's no room for the inputs.
+  error InvalidCapacity(uint256 capacity, uint256 width);
+
+  /// @dev Reverted when there are no inputs to hash.
+  error EmptyInput();
+
+  /// @dev Reverted when an input or a domain separator tag is not a canonical field element,
+  ///   i.e. it's not in [0, p).
+  error NonCanonicalInput(uint256 value);
+
+  /// @dev The BlueSky prime p.
+  uint256 private constant P = 0x7ffffffffffffffffffffffffffffffe0673ddf29e9b5547c000000000000001;
+
   /// @notice Applies the permutation to a state.
+  /// @dev There are 4 full rounds, 46 partial rounds, and 4 more full rounds. Every
+  ///   round adds its 5 round constants, applies the S-box to every element (full rounds) or
+  ///   only to the first one (partial rounds), and multiplies the state by the MDS matrix.
+  ///
+  ///   The function is public rather than external so that the sponge functions can call it
+  ///   internally.
   /// @param state The state, every element in [0, p). Elements outside the range are reduced
   ///   modulo p by the first round, so they alias canonical ones.
   /// @return The permuted state, every element in [0, p).
-  function permute(uint256[5] memory state) external pure returns (uint256[5] memory) {
+  function permute(uint256[5] memory state) public pure returns (uint256[5] memory) {
     assembly ("memory-safe") {
       // Multiplies the state by the MDS matrix.
       function mds(s0, s1, s2, s3, s4) -> n0, n1, n2, n3, n4 {
@@ -5458,267 +5969,64 @@ library Poseidon1T5X7 {
     }
     return state;
   }
-}
 
-/// @title Poseidon1Sponge
-/// @notice The Poseidon1 sponge over BlueSky, built on the permutation libraries in this file.
-/// @dev Matches `hash` and `hash0` of the `starkom-poseidon` crate. The domain separator tags
-///   `dst` initialize the capacity elements state[R..T], so the capacity is C = dst.length and the
-///   rate is R = T - C. The inputs are absorbed R at a time by adding them to state[0..R], and the
-///   state is permuted after every block, the last one included. The output is state[0..R] after
-///   the last permutation.
-/// @dev WARNING: the last block is implicitly padded with zeros, so for example with rate 3 the
-///   inputs [1, 2] and [1, 2, 0] collide. That's fine for inputs whose length is fixed by the
-///   protocol, but otherwise the length must be prepended to the inputs. Also note that a zero
-///   capacity leaves the sponge without security margin, so protocols should use at least one tag.
-/// @dev All the functions are internal, so they're linked statically into their callers, while
-///   every permutation is an external call to its separately deployed library.
-library Poseidon1Sponge {
-  /// @dev Reverted when the capacity, i.e. the number of domain separator tags, is not less than
-  ///   the state width, so that there's no room for the inputs.
-  error InvalidCapacity(uint256 capacity, uint256 width);
-
-  /// @dev Reverted when there are no inputs to hash.
-  error EmptyInput();
-
-  /// @dev Reverted when an input or a domain separator tag is not a canonical field element,
-  ///   i.e. it's not in [0, p).
-  error NonCanonicalInput(uint256 value);
-
-  /// @dev The BlueSky prime p.
-  uint256 private constant P = 0x7ffffffffffffffffffffffffffffffe0673ddf29e9b5547c000000000000001;
-
-  /// @notice Hashes `inputs` with the `Poseidon1T3X5` permutation, returning the whole rate.
-  /// @dev Matches `hash::<BlueSkyConfigT3X5, Scalar, 3, R, C>`.
-  /// @param dst The domain separator tags, which initialize the capacity elements. Their number
-  ///   is the capacity C, which must be less than 3. Every tag must be in [0, p).
-  /// @param inputs The inputs, every one in [0, p). There must be at least one.
-  /// @return output The R = 3 - C elements of the rate after the last permutation.
-  function hashT3X5(
-    uint256[] memory dst,
-    uint256[] memory inputs
-  ) internal pure returns (uint256[] memory output) {
-    uint256 rate = _rate(dst, inputs, 3);
-    uint256[3] memory state;
-    for (uint256 i = 0; i < dst.length; i++) {
-      state[rate + i] = dst[i];
-    }
-    for (uint256 offset = 0; offset < inputs.length; offset += rate) {
-      for (uint256 i = 0; i < rate && offset + i < inputs.length; i++) {
-        state[i] = addmod(state[i], inputs[offset + i], P);
-      }
-      state = Poseidon1T3X5.permute(state);
-    }
-    output = new uint256[](rate);
-    for (uint256 i = 0; i < rate; i++) {
-      output[i] = state[i];
-    }
-  }
-
-  /// @notice Hashes `inputs` with the `Poseidon1T3X5` permutation, returning the first element of
-  ///   the rate (see `hashT3X5`).
-  /// @dev Matches `hash0::<BlueSkyConfigT3X5, Scalar, 3, R, C>`.
-  function hash0T3X5(
-    uint256[] memory dst,
-    uint256[] memory inputs
-  ) internal pure returns (uint256) {
-    return hashT3X5(dst, inputs)[0];
-  }
-
-  /// @notice Hashes `inputs` with the `Poseidon1T4X5` permutation, returning the whole rate.
-  /// @dev Matches `hash::<BlueSkyConfigT4X5, Scalar, 4, R, C>`.
-  /// @param dst The domain separator tags, which initialize the capacity elements. Their number
-  ///   is the capacity C, which must be less than 4. Every tag must be in [0, p).
-  /// @param inputs The inputs, every one in [0, p). There must be at least one.
-  /// @return output The R = 4 - C elements of the rate after the last permutation.
-  function hashT4X5(
-    uint256[] memory dst,
-    uint256[] memory inputs
-  ) internal pure returns (uint256[] memory output) {
-    uint256 rate = _rate(dst, inputs, 4);
-    uint256[4] memory state;
-    for (uint256 i = 0; i < dst.length; i++) {
-      state[rate + i] = dst[i];
-    }
-    for (uint256 offset = 0; offset < inputs.length; offset += rate) {
-      for (uint256 i = 0; i < rate && offset + i < inputs.length; i++) {
-        state[i] = addmod(state[i], inputs[offset + i], P);
-      }
-      state = Poseidon1T4X5.permute(state);
-    }
-    output = new uint256[](rate);
-    for (uint256 i = 0; i < rate; i++) {
-      output[i] = state[i];
-    }
-  }
-
-  /// @notice Hashes `inputs` with the `Poseidon1T4X5` permutation, returning the first element of
-  ///   the rate (see `hashT4X5`).
-  /// @dev Matches `hash0::<BlueSkyConfigT4X5, Scalar, 4, R, C>`.
-  function hash0T4X5(
-    uint256[] memory dst,
-    uint256[] memory inputs
-  ) internal pure returns (uint256) {
-    return hashT4X5(dst, inputs)[0];
-  }
-
-  /// @notice Hashes `inputs` with the `Poseidon1T5X5` permutation, returning the whole rate.
-  /// @dev Matches `hash::<BlueSkyConfigT5X5, Scalar, 5, R, C>`.
+  /// @notice Hashes `inputs` with the sponge, returning the whole rate.
+  /// @dev Matches `hash::<BlueSkyConfigT5X7, Scalar, 5, R, C>`. The domain separator tags `dst`
+  ///   initialize the capacity elements state[R..5], so the capacity is C = dst.length and the
+  ///   rate is R = 5 - C. The inputs are absorbed R at a time by adding them to state[0..R],
+  ///   and the state is permuted after every block, the last one included. The output is
+  ///   state[0..R] after the last permutation.
+  /// @dev WARNING: the last block is implicitly padded with zeros, so for example with rate 3 the
+  ///   inputs [1, 2] and [1, 2, 0] collide. That's fine for inputs whose length is fixed by the
+  ///   protocol, but otherwise the length must be prepended to the inputs. Also note that a zero
+  ///   capacity leaves the sponge without security margin, so protocols should use at least one tag.
   /// @param dst The domain separator tags, which initialize the capacity elements. Their number
   ///   is the capacity C, which must be less than 5. Every tag must be in [0, p).
   /// @param inputs The inputs, every one in [0, p). There must be at least one.
   /// @return output The R = 5 - C elements of the rate after the last permutation.
-  function hashT5X5(
-    uint256[] memory dst,
-    uint256[] memory inputs
-  ) internal pure returns (uint256[] memory output) {
-    uint256 rate = _rate(dst, inputs, 5);
-    uint256[5] memory state;
-    for (uint256 i = 0; i < dst.length; i++) {
-      state[rate + i] = dst[i];
-    }
-    for (uint256 offset = 0; offset < inputs.length; offset += rate) {
-      for (uint256 i = 0; i < rate && offset + i < inputs.length; i++) {
-        state[i] = addmod(state[i], inputs[offset + i], P);
-      }
-      state = Poseidon1T5X5.permute(state);
-    }
+  function hash(
+    uint256[] calldata dst,
+    uint256[] calldata inputs
+  ) external pure returns (uint256[] memory output) {
+    (uint256[5] memory state, uint256 rate) = _absorb(dst, inputs);
     output = new uint256[](rate);
     for (uint256 i = 0; i < rate; i++) {
       output[i] = state[i];
     }
   }
 
-  /// @notice Hashes `inputs` with the `Poseidon1T5X5` permutation, returning the first element of
-  ///   the rate (see `hashT5X5`).
-  /// @dev Matches `hash0::<BlueSkyConfigT5X5, Scalar, 5, R, C>`.
-  function hash0T5X5(
-    uint256[] memory dst,
-    uint256[] memory inputs
-  ) internal pure returns (uint256) {
-    return hashT5X5(dst, inputs)[0];
-  }
-
-  /// @notice Hashes `inputs` with the `Poseidon1T3X7` permutation, returning the whole rate.
-  /// @dev Matches `hash::<BlueSkyConfigT3X7, Scalar, 3, R, C>`.
-  /// @param dst The domain separator tags, which initialize the capacity elements. Their number
-  ///   is the capacity C, which must be less than 3. Every tag must be in [0, p).
-  /// @param inputs The inputs, every one in [0, p). There must be at least one.
-  /// @return output The R = 3 - C elements of the rate after the last permutation.
-  function hashT3X7(
-    uint256[] memory dst,
-    uint256[] memory inputs
-  ) internal pure returns (uint256[] memory output) {
-    uint256 rate = _rate(dst, inputs, 3);
-    uint256[3] memory state;
-    for (uint256 i = 0; i < dst.length; i++) {
-      state[rate + i] = dst[i];
-    }
-    for (uint256 offset = 0; offset < inputs.length; offset += rate) {
-      for (uint256 i = 0; i < rate && offset + i < inputs.length; i++) {
-        state[i] = addmod(state[i], inputs[offset + i], P);
-      }
-      state = Poseidon1T3X7.permute(state);
-    }
-    output = new uint256[](rate);
-    for (uint256 i = 0; i < rate; i++) {
-      output[i] = state[i];
-    }
-  }
-
-  /// @notice Hashes `inputs` with the `Poseidon1T3X7` permutation, returning the first element of
-  ///   the rate (see `hashT3X7`).
-  /// @dev Matches `hash0::<BlueSkyConfigT3X7, Scalar, 3, R, C>`.
-  function hash0T3X7(
-    uint256[] memory dst,
-    uint256[] memory inputs
-  ) internal pure returns (uint256) {
-    return hashT3X7(dst, inputs)[0];
-  }
-
-  /// @notice Hashes `inputs` with the `Poseidon1T4X7` permutation, returning the whole rate.
-  /// @dev Matches `hash::<BlueSkyConfigT4X7, Scalar, 4, R, C>`.
-  /// @param dst The domain separator tags, which initialize the capacity elements. Their number
-  ///   is the capacity C, which must be less than 4. Every tag must be in [0, p).
-  /// @param inputs The inputs, every one in [0, p). There must be at least one.
-  /// @return output The R = 4 - C elements of the rate after the last permutation.
-  function hashT4X7(
-    uint256[] memory dst,
-    uint256[] memory inputs
-  ) internal pure returns (uint256[] memory output) {
-    uint256 rate = _rate(dst, inputs, 4);
-    uint256[4] memory state;
-    for (uint256 i = 0; i < dst.length; i++) {
-      state[rate + i] = dst[i];
-    }
-    for (uint256 offset = 0; offset < inputs.length; offset += rate) {
-      for (uint256 i = 0; i < rate && offset + i < inputs.length; i++) {
-        state[i] = addmod(state[i], inputs[offset + i], P);
-      }
-      state = Poseidon1T4X7.permute(state);
-    }
-    output = new uint256[](rate);
-    for (uint256 i = 0; i < rate; i++) {
-      output[i] = state[i];
-    }
-  }
-
-  /// @notice Hashes `inputs` with the `Poseidon1T4X7` permutation, returning the first element of
-  ///   the rate (see `hashT4X7`).
-  /// @dev Matches `hash0::<BlueSkyConfigT4X7, Scalar, 4, R, C>`.
-  function hash0T4X7(
-    uint256[] memory dst,
-    uint256[] memory inputs
-  ) internal pure returns (uint256) {
-    return hashT4X7(dst, inputs)[0];
-  }
-
-  /// @notice Hashes `inputs` with the `Poseidon1T5X7` permutation, returning the whole rate.
-  /// @dev Matches `hash::<BlueSkyConfigT5X7, Scalar, 5, R, C>`.
-  /// @param dst The domain separator tags, which initialize the capacity elements. Their number
-  ///   is the capacity C, which must be less than 5. Every tag must be in [0, p).
-  /// @param inputs The inputs, every one in [0, p). There must be at least one.
-  /// @return output The R = 5 - C elements of the rate after the last permutation.
-  function hashT5X7(
-    uint256[] memory dst,
-    uint256[] memory inputs
-  ) internal pure returns (uint256[] memory output) {
-    uint256 rate = _rate(dst, inputs, 5);
-    uint256[5] memory state;
-    for (uint256 i = 0; i < dst.length; i++) {
-      state[rate + i] = dst[i];
-    }
-    for (uint256 offset = 0; offset < inputs.length; offset += rate) {
-      for (uint256 i = 0; i < rate && offset + i < inputs.length; i++) {
-        state[i] = addmod(state[i], inputs[offset + i], P);
-      }
-      state = Poseidon1T5X7.permute(state);
-    }
-    output = new uint256[](rate);
-    for (uint256 i = 0; i < rate; i++) {
-      output[i] = state[i];
-    }
-  }
-
-  /// @notice Hashes `inputs` with the `Poseidon1T5X7` permutation, returning the first element of
-  ///   the rate (see `hashT5X7`).
+  /// @notice Hashes `inputs` with the sponge, returning the first element of the rate (see `hash`).
   /// @dev Matches `hash0::<BlueSkyConfigT5X7, Scalar, 5, R, C>`.
-  function hash0T5X7(
-    uint256[] memory dst,
-    uint256[] memory inputs
-  ) internal pure returns (uint256) {
-    return hashT5X7(dst, inputs)[0];
+  function hash0(
+    uint256[] calldata dst,
+    uint256[] calldata inputs
+  ) external pure returns (uint256) {
+    (uint256[5] memory state, ) = _absorb(dst, inputs);
+    return state[0];
   }
 
-  /// @dev Checks the arguments of a hash with state width `width`, reverting if they're invalid,
-  ///   and returns its rate.
-  function _rate(
-    uint256[] memory dst,
-    uint256[] memory inputs,
-    uint256 width
-  ) private pure returns (uint256) {
-    if (dst.length >= width) {
-      revert InvalidCapacity(dst.length, width);
+  /// @dev Checks the arguments of a hash, reverting if they're invalid, and absorbs `inputs` into
+  ///   a state whose capacity is initialized with `dst`. Returns the final state and the rate.
+  function _absorb(
+    uint256[] calldata dst,
+    uint256[] calldata inputs
+  ) private pure returns (uint256[5] memory state, uint256 rate) {
+    rate = _rate(dst, inputs);
+    for (uint256 i = 0; i < dst.length; i++) {
+      state[rate + i] = dst[i];
+    }
+    for (uint256 offset = 0; offset < inputs.length; offset += rate) {
+      for (uint256 i = 0; i < rate && offset + i < inputs.length; i++) {
+        state[i] = addmod(state[i], inputs[offset + i], P);
+      }
+      state = permute(state);
+    }
+  }
+
+  /// @dev Checks the arguments of a hash, reverting if they're invalid, and returns its rate.
+  function _rate(uint256[] calldata dst, uint256[] calldata inputs) private pure returns (uint256) {
+    if (dst.length >= 5) {
+      revert InvalidCapacity(dst.length, 5);
     }
     if (inputs.length == 0) {
       revert EmptyInput();
@@ -5729,7 +6037,7 @@ library Poseidon1Sponge {
     for (uint256 i = 0; i < inputs.length; i++) {
       _checkCanonical(inputs[i]);
     }
-    return width - dst.length;
+    return 5 - dst.length;
   }
 
   /// @dev Reverts if `value` is not a canonical field element.

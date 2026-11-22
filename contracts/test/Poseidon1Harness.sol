@@ -34,83 +34,83 @@ contract Poseidon1Harness {
     uint256[] memory dst,
     uint256[] memory inputs
   ) external pure returns (uint256[] memory) {
-    return Poseidon1Sponge.hashT3X5(dst, inputs);
+    return Poseidon1T3X5.hash(dst, inputs);
   }
 
   function hash0T3X5(
     uint256[] memory dst,
     uint256[] memory inputs
   ) external pure returns (uint256) {
-    return Poseidon1Sponge.hash0T3X5(dst, inputs);
+    return Poseidon1T3X5.hash0(dst, inputs);
   }
 
   function hashT4X5(
     uint256[] memory dst,
     uint256[] memory inputs
   ) external pure returns (uint256[] memory) {
-    return Poseidon1Sponge.hashT4X5(dst, inputs);
+    return Poseidon1T4X5.hash(dst, inputs);
   }
 
   function hash0T4X5(
     uint256[] memory dst,
     uint256[] memory inputs
   ) external pure returns (uint256) {
-    return Poseidon1Sponge.hash0T4X5(dst, inputs);
+    return Poseidon1T4X5.hash0(dst, inputs);
   }
 
   function hashT5X5(
     uint256[] memory dst,
     uint256[] memory inputs
   ) external pure returns (uint256[] memory) {
-    return Poseidon1Sponge.hashT5X5(dst, inputs);
+    return Poseidon1T5X5.hash(dst, inputs);
   }
 
   function hash0T5X5(
     uint256[] memory dst,
     uint256[] memory inputs
   ) external pure returns (uint256) {
-    return Poseidon1Sponge.hash0T5X5(dst, inputs);
+    return Poseidon1T5X5.hash0(dst, inputs);
   }
 
   function hashT3X7(
     uint256[] memory dst,
     uint256[] memory inputs
   ) external pure returns (uint256[] memory) {
-    return Poseidon1Sponge.hashT3X7(dst, inputs);
+    return Poseidon1T3X7.hash(dst, inputs);
   }
 
   function hash0T3X7(
     uint256[] memory dst,
     uint256[] memory inputs
   ) external pure returns (uint256) {
-    return Poseidon1Sponge.hash0T3X7(dst, inputs);
+    return Poseidon1T3X7.hash0(dst, inputs);
   }
 
   function hashT4X7(
     uint256[] memory dst,
     uint256[] memory inputs
   ) external pure returns (uint256[] memory) {
-    return Poseidon1Sponge.hashT4X7(dst, inputs);
+    return Poseidon1T4X7.hash(dst, inputs);
   }
 
   function hash0T4X7(
     uint256[] memory dst,
     uint256[] memory inputs
   ) external pure returns (uint256) {
-    return Poseidon1Sponge.hash0T4X7(dst, inputs);
+    return Poseidon1T4X7.hash0(dst, inputs);
   }
 
   function hashT5X7(
     uint256[] memory dst,
     uint256[] memory inputs
   ) external pure returns (uint256[] memory) {
-    return Poseidon1Sponge.hashT5X7(dst, inputs);
+    return Poseidon1T5X7.hash(dst, inputs);
   }
 
   function hash0T5X7(
     uint256[] memory dst,
     uint256[] memory inputs
   ) external pure returns (uint256) {
-    return Poseidon1Sponge.hash0T5X7(dst, inputs);
+    return Poseidon1T5X7.hash0(dst, inputs);
   }
 }
