@@ -1,6 +1,8 @@
 # BlueSky.sol
 
 [![CI](https://img.shields.io/github/actions/workflow/status/libernet-xyz/bluesky-sol/ci.yml?label=CI)](https://github.com/libernet-xyz/bluesky-sol/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@starkom/bluesky-sol)](https://www.npmjs.com/package/@starkom/bluesky-sol)
+[![license](https://img.shields.io/npm/l/@starkom/bluesky-sol)](https://github.com/libernet-xyz/bluesky-sol/blob/main/LICENSE)
 
 ## Overview
 
