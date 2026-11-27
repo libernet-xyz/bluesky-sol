@@ -7,7 +7,7 @@ import "../Poseidon1.sol";
 ///   in a realistic use and measure its cost. It must be linked with `Poseidon1T4X7` and
 ///   `Poseidon1T5X7`.
 ///
-///   The trees are those of `tools/poseidon1/src/bin/merkle.rs`: the leaves are at level 0, and
+///   The trees are those of `tools/poseidon1/src/merkle.rs`: the leaves are at level 0, and
 ///   every inner node at level `l` is the `hash0` of its children, which it picks by the digit
 ///   `l - 1` of the key in base 2 or 3, with the two domain separator tags `dst`.
 ///

@@ -1,27 +1,31 @@
 // Copyright 2026 The Libernet Team
 // SPDX-License-Identifier: Apache-2.0
 
-//! Generates `contracts/Poseidon1.sol`: the Poseidon1 permutations over BlueSky supported by the
+//! Generates `contracts/Poseidon2.sol`: the Poseidon2 permutations over BlueSky supported by the
 //! Solidity library, each one in its own library together with the sponge built on it.
 //!
-//! The round constants, the MDS matrices, and the number of rounds come from the configurations of
-//! the `starkom-poseidon` crate, so the generated permutations match the Rust ones by construction.
+//! The round constants, the external and internal matrices, and the number of rounds come from the
+//! configurations of the `starkom-poseidon2` crate, so the generated permutations match the Rust
+//! ones by construction. The matrices aren't multiplied entry by entry but with the cheaper
+//! formulas that their Poseidon2 structure allows (see `LinearLayer`), and the generator panics if
+//! a matrix doesn't have one of the supported structures.
 //!
-//! The output isn't formatted: run `npm run codegen` from the root of the repository, which writes
-//! it to `contracts/Poseidon1.sol` and formats it with prettier.
+//! The output isn't formatted: run `npm run codegen:poseidon2` from the root of the repository,
+//! which writes it to `contracts/Poseidon2.sol` and formats it with prettier.
 
-use starkom_bluesky::Scalar;
-use starkom_poseidon::{
-    BlueSkyConfigT3X5, BlueSkyConfigT3X7, BlueSkyConfigT4X5, BlueSkyConfigT4X7, BlueSkyConfigT5X5,
-    BlueSkyConfigT5X7, Config,
-};
+use starkom_bluesky::{Scalar, from_const};
+use starkom_ff::Field;
+use starkom_poseidon2::{BlueSkyConfig3, BlueSkyConfig4, Config};
 
 /// The BlueSky prime p.
 const MODULUS: &str = "0x7ffffffffffffffffffffffffffffffe0673ddf29e9b5547c000000000000001";
 
-/// The parameters of a Poseidon1 permutation, as defined by a `starkom-poseidon` configuration.
+/// The 4x4 matrix M4 of the Poseidon2 paper, row after row. It's the external matrix for T=4.
+const M4: [u64; 16] = [5, 7, 1, 3, 4, 6, 1, 1, 1, 3, 5, 7, 1, 1, 4, 6];
+
+/// The parameters of a Poseidon2 permutation, as defined by a `starkom-poseidon2` configuration.
 struct Parameters {
-    /// The name of the configuration in the `starkom-poseidon` crate.
+    /// The name of the configuration in the `starkom-poseidon2` crate.
     config_name: &'static str,
     /// The state width T.
     width: usize,
@@ -31,10 +35,13 @@ struct Parameters {
     full_rounds_per_side: usize,
     /// The number of partial rounds.
     partial_rounds: usize,
-    /// The round constants, `width` per round, round after round.
+    /// The round constants, `width` per round, round after round. The partial rounds only use the
+    /// first one of theirs.
     round_constants: &'static [Scalar],
-    /// The MDS matrix, row after row.
-    mds_matrix: &'static [Scalar],
+    /// The matrix of the full rounds and of the initial linear layer, row after row.
+    external_matrix: &'static [Scalar],
+    /// The matrix of the partial rounds, row after row.
+    internal_matrix: &'static [Scalar],
 }
 
 impl Parameters {
@@ -46,13 +53,15 @@ impl Parameters {
             full_rounds_per_side: C::num_full_rounds_per_side(),
             partial_rounds: C::num_partial_rounds(),
             round_constants: C::get_round_constants(),
-            mds_matrix: C::get_mds_matrix(),
+            external_matrix: C::get_external_matrix(),
+            internal_matrix: C::get_internal_matrix(),
         };
         assert_eq!(
             parameters.round_constants.len(),
             parameters.num_rounds() * T
         );
-        assert_eq!(parameters.mds_matrix.len(), T * T);
+        assert_eq!(parameters.external_matrix.len(), T * T);
+        assert_eq!(parameters.internal_matrix.len(), T * T);
         parameters
     }
 
@@ -66,7 +75,7 @@ impl Parameters {
     }
 
     fn library_name(&self) -> String {
-        format!("Poseidon1{}", self.suffix())
+        format!("Poseidon2{}", self.suffix())
     }
 
     /// The names of the state variables, e.g. `s0, s1, s2`.
@@ -80,6 +89,38 @@ impl Parameters {
     fn is_full_round(&self, round: usize) -> bool {
         round < self.full_rounds_per_side
             || round >= self.full_rounds_per_side + self.partial_rounds
+    }
+}
+
+/// The structure of a Poseidon2 matrix, which determines how the generated code multiplies the
+/// state by it.
+enum LinearLayer {
+    /// The matrix is J + D, where J is the all-ones matrix and D is the diagonal matrix with these
+    /// entries, so the i-th element of the product is the sum of the state plus D_i times the i-th
+    /// element. That's the structure of every internal matrix and of the external matrix for T=3,
+    /// circ(2, 1, 1) = J + I.
+    SumPlusDiagonal(Vec<Scalar>),
+    /// The matrix is `M4`.
+    M4,
+}
+
+impl LinearLayer {
+    /// Returns the structure of `matrix`, panicking if it's not supported.
+    fn of(matrix: &[Scalar], width: usize) -> Self {
+        let off_diagonal_ones =
+            (0..width).all(|i| (0..width).all(|j| i == j || matrix[i * width + j] == Scalar::ONE));
+        if off_diagonal_ones {
+            return Self::SumPlusDiagonal(
+                (0..width)
+                    .map(|i| matrix[i * width + i] - Scalar::ONE)
+                    .collect(),
+            );
+        }
+        assert!(
+            matrix == M4.map(from_const),
+            "the matrix is neither J + D nor M4"
+        );
+        Self::M4
     }
 }
 
@@ -101,24 +142,46 @@ fn sbox(variable: &str, constant: &Scalar, alpha: usize) -> String {
     format!("{{\n{}\n}}\n", lines.join("\n"))
 }
 
-/// Generates the Yul function that multiplies the state by the MDS matrix.
-fn mds_function(parameters: &Parameters) -> String {
+/// Generates the Yul function `name` that multiplies the state by `matrix`, the `description`
+/// matrix.
+fn linear_function(
+    parameters: &Parameters,
+    name: &str,
+    description: &str,
+    matrix: &[Scalar],
+) -> String {
     let width = parameters.width;
     let mut code = format!(
-        "// Multiplies the state by the MDS matrix.\n\
-         function mds({}) -> {} {{\n\
+        "// Multiplies the state by the {description}.\n\
+         function {name}({}) -> {} {{\n\
          let p := {MODULUS}\n",
         parameters.variables("s"),
         parameters.variables("n"),
     );
-    for i in 0..width {
-        for j in 0..width {
-            let entry = &parameters.mds_matrix[i * width + j];
-            if j == 0 {
-                code += &format!("n{i} := mulmod(s{j}, {entry}, p)\n");
-            } else {
-                code += &format!("n{i} := addmod(n{i}, mulmod(s{j}, {entry}, p), p)\n");
+    match LinearLayer::of(matrix, width) {
+        LinearLayer::SumPlusDiagonal(diagonal) => {
+            code += "let sum := addmod(s0, s1, p)\n";
+            for i in 2..width {
+                code += &format!("sum := addmod(sum, s{i}, p)\n");
             }
+            for (i, entry) in diagonal.iter().enumerate() {
+                if *entry == Scalar::ONE {
+                    code += &format!("n{i} := addmod(s{i}, sum, p)\n");
+                } else {
+                    code += &format!("n{i} := addmod(mulmod(s{i}, {entry}, p), sum, p)\n");
+                }
+            }
+        }
+        LinearLayer::M4 => {
+            code += "// The addition chain of the Poseidon2 paper for M4.\n\
+                     let t0 := addmod(s0, s1, p)\n\
+                     let t1 := addmod(s2, s3, p)\n\
+                     let t2 := addmod(mulmod(s1, 2, p), t1, p)\n\
+                     let t3 := addmod(mulmod(s3, 2, p), t0, p)\n\
+                     n3 := addmod(mulmod(t1, 4, p), t3, p)\n\
+                     n1 := addmod(mulmod(t0, 4, p), t2, p)\n\
+                     n0 := addmod(t3, n1, p)\n\
+                     n2 := addmod(t2, n3, p)\n";
         }
     }
     code + "}\n"
@@ -128,41 +191,52 @@ fn permutation_library(parameters: &Parameters) -> String {
     let width = parameters.width;
     let full = parameters.full_rounds_per_side;
     let partial = parameters.partial_rounds;
+    let state = parameters.variables("s");
     let mut body = String::new();
-    body += &mds_function(parameters);
+    body += &linear_function(
+        parameters,
+        "externalLinear",
+        "external matrix",
+        parameters.external_matrix,
+    );
+    body += &linear_function(
+        parameters,
+        "internalLinear",
+        "internal matrix",
+        parameters.internal_matrix,
+    );
     body += &format!("let p := {MODULUS}\n");
     for i in 0..width {
         body += &format!("let s{i} := mload(add(state, {:#x}))\n", i * 32);
     }
+    body += "// Initial linear layer.\n";
+    body += &format!("{state} := externalLinear({state})\n");
     for round in 0..parameters.num_rounds() {
-        let full_round = parameters.is_full_round(round);
-        let kind = if full_round { "full" } else { "partial" };
-        body += &format!("// Round {round} ({kind}).\n");
-        for i in 0..width {
-            let constant = &parameters.round_constants[round * width + i];
-            if i == 0 || full_round {
+        if parameters.is_full_round(round) {
+            body += &format!("// Round {round} (full).\n");
+            for i in 0..width {
+                let constant = &parameters.round_constants[round * width + i];
                 body += &sbox(&format!("s{i}"), constant, parameters.alpha);
-            } else {
-                body += &format!("s{i} := addmod(s{i}, {constant}, p)\n");
             }
+            body += &format!("{state} := externalLinear({state})\n");
+        } else {
+            body += &format!("// Round {round} (partial).\n");
+            let constant = &parameters.round_constants[round * width];
+            body += &sbox("s0", constant, parameters.alpha);
+            body += &format!("{state} := internalLinear({state})\n");
         }
-        body += &format!(
-            "{} := mds({})\n",
-            parameters.variables("s"),
-            parameters.variables("s")
-        );
     }
     for i in 0..width {
         body += &format!("mstore(add(state, {:#x}), s{i})\n", i * 32);
     }
     format!(
         r#"/// @title {library}
-/// @notice The Poseidon1 permutation over BlueSky with state width {width} and S-box x^{alpha}, and
+/// @notice The Poseidon2 permutation over BlueSky with state width {width} and S-box x^{alpha}, and
 ///   the sponge built on it.
 /// @dev Matches `permutation::<{config}, Scalar, {width}>`, `hash`, and `hash0` of the
-///   `starkom-poseidon` crate.
-/// @dev The round constants and the MDS matrix are hard-coded rather than stored, but they take a
-///   large share of the contract size limit, so this library must be deployed on its own and
+///   `starkom-poseidon2` crate.
+/// @dev The round constants and the matrices are hard-coded rather than stored, but they take a
+///   significant share of the contract size limit, so this library must be deployed on its own and
 ///   linked by its users, which call its functions with `DELEGATECALL`. The sponge functions are
 ///   in the same library so that they call the permutation internally rather than with a
 ///   `DELEGATECALL` per block.
@@ -182,14 +256,16 @@ library {library} {{
   uint256 private constant P = {MODULUS};
 
   /// @notice Applies the permutation to a state.
-  /// @dev There are {full} full rounds, {partial} partial rounds, and {full} more full rounds. Every
-  ///   round adds its {width} round constants, applies the S-box to every element (full rounds) or
-  ///   only to the first one (partial rounds), and multiplies the state by the MDS matrix.
+  /// @dev The state is first multiplied by the external matrix, then there are {full} full rounds, {partial}
+  ///   partial rounds, and {full} more full rounds. Every full round adds its {width} round constants, applies
+  ///   the S-box to every element, and multiplies the state by the external matrix. Every partial
+  ///   round adds its round constant to the first element only, applies the S-box to it, and
+  ///   multiplies the state by the internal matrix.
   ///
   ///   The function is public rather than external so that the sponge functions can call it
   ///   internally.
   /// @param state The state, every element in [0, p). Elements outside the range are reduced
-  ///   modulo p by the first round, so they alias canonical ones.
+  ///   modulo p by the first multiplication by the external matrix, so they alias canonical ones.
   /// @return The permuted state, every element in [0, p).
   function permute(
     uint256[{width}] memory state
@@ -208,7 +284,7 @@ library {library} {{
   /// @dev WARNING: the last block is implicitly padded with zeros, so for example with rate 3 the
   ///   inputs [1, 2] and [1, 2, 0] collide. That's fine for inputs whose length is fixed by the
   ///   protocol, but otherwise the length must be prepended to the inputs. Also note that a zero
-  ///   capacity leaves the sponge without security margin, so protocols should use at least one tag.
+  ///   capacity leaves no security margin, so protocols should use at least one tag.
   /// @param dst The domain separator tags, which initialize the capacity elements. Their number
   ///   is the capacity C, which must be less than {width}. Every tag must be in [0, p).
   /// @param inputs The inputs, every one in [0, p). There must be at least one.
@@ -292,19 +368,15 @@ library {library} {{
 
 fn main() {
     let permutations = [
-        Parameters::of::<BlueSkyConfigT3X5, 3>("BlueSkyConfigT3X5"),
-        Parameters::of::<BlueSkyConfigT4X5, 4>("BlueSkyConfigT4X5"),
-        Parameters::of::<BlueSkyConfigT5X5, 5>("BlueSkyConfigT5X5"),
-        Parameters::of::<BlueSkyConfigT3X7, 3>("BlueSkyConfigT3X7"),
-        Parameters::of::<BlueSkyConfigT4X7, 4>("BlueSkyConfigT4X7"),
-        Parameters::of::<BlueSkyConfigT5X7, 5>("BlueSkyConfigT5X7"),
+        Parameters::of::<BlueSkyConfig3, 3>("BlueSkyConfig3"),
+        Parameters::of::<BlueSkyConfig4, 4>("BlueSkyConfig4"),
     ];
     print!(
         r#"// SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.34;
 
-// Generated by `tools/poseidon1` (`npm run codegen`) from the parameters of the `starkom-poseidon`
-// crate. Don't edit it by hand.
+// Generated by `tools/poseidon2` (`npm run codegen:poseidon2`) from the parameters of the
+// `starkom-poseidon2` crate. Don't edit it by hand.
 
 "#
     );
